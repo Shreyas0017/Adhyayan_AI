@@ -9,7 +9,7 @@ interface FooterLinkProps {
   external?: boolean;
 }
 
-const FooterLink = ({ href, children, external = false }: FooterLinkProps) => (
+const FooterLink= ({ href, children, external = false }: FooterLinkProps) => (
   <Link 
     href={href}
     className="text-neutral-400 hover:text-white transition-colors duration-200 flex items-center gap-1 group"
