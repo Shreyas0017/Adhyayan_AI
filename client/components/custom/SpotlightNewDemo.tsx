@@ -1,9 +1,9 @@
 "use client";
 import React from "react";
-import { Spotlight } from "@/components/ui/spotlight-new";
-import { FlipWords } from "@/components/ui/flip-words";
-import GoogleSignInButton from "@/components/ui/google-signin-button";
-import LearnMoreButton from "@/components/ui/learn-more-button";
+import { Spotlight } from "@/client/components/ui/spotlight-new";
+import { FlipWords } from "@/client/components/ui/flip-words";
+import GoogleSignInButton from "@/client/components/ui/google-signin-button";
+import LearnMoreButton from "@/client/components/ui/learn-more-button";
 
 export function SpotlightNewDemo() {
   const words = ["Transform", "Revolutionize", "Accelerate", "Master"];
