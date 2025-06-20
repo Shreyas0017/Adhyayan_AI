@@ -1,11 +1,11 @@
 'use client'; 
 
-import { HeroSection } from "@/components/hero-section-1";
-import { CustomFeatures } from "@/components/custom/CustomFeatures";
-import { InfiniteMovingCardsDemo } from "@/components/custom/InfiniteMovingCardsDemo";
-import { FAQSection } from "@/components/custom/FAQSection";
-import { SpotlightNewDemo } from "@/components/custom/SpotlightNewDemo";
-import { ProfessionalFooter } from "@/components/custom/ProfessionalFooter";
+import { HeroSection } from "@/client/components/hero-section-1";
+import { CustomFeatures } from "@/client/components/custom/CustomFeatures";
+import { InfiniteMovingCardsDemo } from "@/client/components/custom/InfiniteMovingCardsDemo";
+import { FAQSection } from "@/client/components/custom/FAQSection";
+import { SpotlightNewDemo } from "@/client/components/custom/SpotlightNewDemo";
+import { ProfessionalFooter } from "@/client/components/custom/ProfessionalFooter";
 
 export const HeroPage = () => {
   return (
