@@ -1,7 +1,7 @@
 "use client";
 import React from 'react';
 import styled from 'styled-components';
-import { useAuth } from '@/client/components/lib/auth-context';
+import { useAuth } from '@/client/lib/auth-context';
 import { useRouter } from 'next/navigation';
 
 const LearnMoreButton = () => {

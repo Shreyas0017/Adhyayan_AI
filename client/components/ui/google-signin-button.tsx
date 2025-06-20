@@ -2,8 +2,8 @@
 import React from 'react';
 import styled from 'styled-components';
 import { signInWithPopup, signOut } from 'firebase/auth';
-import { auth, googleProvider } from '@/client/components/lib/firebase';
-import { useAuth } from '@/client/components/lib/auth-context';
+import { auth, googleProvider } from '@/client/lib/firebase';
+import { useAuth } from '@/client/lib/auth-context';
 import { useRouter } from 'next/navigation';
 
 const GoogleSignInButton = () => {

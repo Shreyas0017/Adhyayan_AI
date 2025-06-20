@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
-import { apiService } from '@/client/components/lib/api';
+import { apiService } from '@/client/lib/api';
 import { useRouter } from 'next/navigation';
 
 interface CustomUser {
