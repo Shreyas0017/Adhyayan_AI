@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useCallback, useEffect, useRef } from "react";
-import { cn } from "../../lib/utils";
+import { cn } from "../../lib/utils/dateUtils";
 import { animate } from "motion/react";
 
 interface GlowingEffectProps {
