@@ -1,6 +1,6 @@
 'use client'
 
-import { SpiralAnimation } from "@/components/ui/spiral-animation"
+import { SpiralAnimation } from "@/client/components/ui/spiral-animation"
 import { useState, useEffect } from 'react'
 
 interface SpiralIntroProps {

@@ -1,7 +1,7 @@
 'use client';
 
 import { BookOpen, Map, MessageSquare, Headphones, Users } from "lucide-react";
-import { GlowingEffect } from "@/components/ui/glowing-effect";
+import { GlowingEffect } from "@/client/components/ui/glowing-effect";
 
 export function CustomFeatures() {
   return (

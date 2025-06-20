@@ -1,6 +1,6 @@
 'use client';
 
-import StickyBanner from "@/client/components/ui/sticky-banner";
+import { StickyBanner } from "@/client/components/ui/sticky-banner";
 import { ReactNode } from "react";
 
 interface CustomStickyBannerProps {

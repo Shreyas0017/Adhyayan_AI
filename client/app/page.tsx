@@ -1,8 +1,8 @@
 'use client'
 
-import CustomStickyBanner from "@/components/custom/CustomStickyBanner";
-import { HeroPage } from "@/components/custom/HeroPage";
-import { SpiralIntro } from "@/components/custom/SpiralIntro";
+import CustomStickyBanner from "@/client/components/custom/CustomStickyBanner";
+import { HeroPage } from "@/client/components/custom/HeroPage";
+import { SpiralIntro } from "@/client/components/custom/SpiralIntro";
 import { useState, useEffect } from 'react';
 
 export default function Home() {
