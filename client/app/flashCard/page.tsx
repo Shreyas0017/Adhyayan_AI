@@ -1,26 +1,32 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect, useRef } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect } from "react"
+import { useAuth } from "@/lib/auth-context"
+import { useRouter } from "next/navigation"
+import { Card, CardBody, Button, Input, Chip } from "@heroui/react"
+import { WavyBackground } from "@/components/ui/wavy-background"
+import { GyanPointsDisplay } from "@/components/custom/GyanPointsDisplay"
+import { FloatingDock } from "@/components/ui/floating-dock"
+import toast from "react-hot-toast"
 import {
-  Loader2,
-  Zap,
-  RotateCcw,
-  Lightbulb,
-  GraduationCap,
-  FlipVertical,
-  Stars,
-  ArrowLeftCircle,
-  ArrowRightCircle,
-  Mic,
-  MicOff,
-  Upload,
-} from "lucide-react"
+  IconArrowLeft,
+  IconBrain,
+  IconHistory,
+  IconTrash,
+  IconEye,
+  IconPlus,
+  IconCards,
+  IconRefresh,
+  IconFlipVertical,
+  IconStar,
+  IconCheck,
+  IconHome,
+  IconUsers,
+  IconSettings,
+  IconLogout,
+  IconMap,
+  IconList,
+} from "@tabler/icons-react"
 
 interface Flashcard {
   id: string
@@ -28,69 +34,139 @@ interface Flashcard {
   answer: string
 }
 
-declare global {
-  interface Window {
-    webkitSpeechRecognition: any
-    SpeechRecognition: any
-  }
+interface FlashcardSet {
+  id: string
+  topic: string
+  flashcards: Flashcard[]
+  createdAt: string
+  count: number
 }
 
-export default function FlashCardPage() {
+export default function FlashcardPage() {
+  const { user, loading, isAuthenticated, logout } = useAuth()
+  const router = useRouter()
   const [topic, setTopic] = useState("")
-  const [flashcards, setFlashcards] = useState<Flashcard[]>([])
+  const [count, setCount] = useState(15)
   const [isGenerating, setIsGenerating] = useState(false)
-  const [flippedCards, setFlippedCards] = useState<{ [key: string]: boolean }>({})
-  const [currentCardIndex, setCurrentCardIndex] = useState(0)
-  const [isListening, setIsListening] = useState(false)
-  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null)
-  const [transcript, setTranscript] = useState("")
-  const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const [currentFlashcards, setCurrentFlashcards] = useState<Flashcard[]>([])
+  const [history, setHistory] = useState<FlashcardSet[]>([])
+  const [showHistory, setShowHistory] = useState(false)
+  const [selectedSet, setSelectedSet] = useState<FlashcardSet | null>(null)
+  const [selectedCardIndex, setSelectedCardIndex] = useState(0)
+  const [completedCards, setCompletedCards] = useState<Set<number>>(new Set())
 
-  useEffect(() => {
-    if (typeof window !== "undefined" && "webkitSpeechRecognition" in window) {
-      const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition
-      const recognitionInstance = new SpeechRecognition()
-
-      recognitionInstance.continuous = true
-      recognitionInstance.interimResults = true
-      recognitionInstance.lang = "en-US"
-
-      recognitionInstance.onresult = (event) => {
-        let finalTranscript = ""
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript
-          }
-        }
-        if (finalTranscript) {
-          setTranscript(finalTranscript)
-          setTopic((prev) => prev + " " + finalTranscript)
-        }
-      }
-
-      recognitionInstance.onend = () => {
-        setIsListening(false)
-      }
-
-      recognitionInstance.onerror = (event) => {
-        console.error("Speech recognition error:", event.error)
-        setIsListening(false)
-      }
-
-      setRecognition(recognitionInstance)
-      recognitionRef.current = recognitionInstance
+  const handleSignOut = async () => {
+    try {
+      await logout();
+      router.push('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
     }
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.onresult = null
-        recognitionRef.current.onend = null
-        recognitionRef.current.onerror = null
+  };
+
+  const dockLinks = [
+    {
+      title: "Home",
+      icon: (
+        <IconHome className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/",
+    },
+    {
+      title: "Dashboard",
+      icon: (
+        <IconBrain className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/dashboard",
+    },
+    {
+      title: "Quiz",
+      icon: (
+        <IconUsers className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/create-room",
+    },
+    {
+      title: "Mind Map",
+      icon: (
+        <IconMap className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/mind-map",
+    },    {
+      title: "Flash Cards",
+      icon: (
+        <IconList className="h-full w-full text-red-400 dark:text-red-400" />
+      ),
+      href: "/flashCard",
+    },
+    {
+      title: "Settings",
+      icon: (
+        <IconSettings className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/settings",
+    },
+    {
+      title: "Sign Out",
+      icon: (
+        <IconLogout className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "#",
+      onClick: handleSignOut,
+    },
+  ];
+
+  // Load history from localStorage on component mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedHistory = localStorage.getItem("flashcard-history")
+      if (savedHistory) {
+        try {
+          setHistory(JSON.parse(savedHistory))
+        } catch (error) {
+          console.error("Error loading flashcard history:", error)
+        }
       }
     }
   }, [])
 
+  // Save history to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== "undefined" && history.length > 0) {
+      localStorage.setItem("flashcard-history", JSON.stringify(history))
+    }
+  }, [history])
+
+  // Reset selected card and completed cards when flashcards change
+  useEffect(() => {
+    setSelectedCardIndex(0)
+    setCompletedCards(new Set())
+  }, [currentFlashcards])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
+          <div
+            className="absolute inset-0 w-16 h-16 border-4 border-pink-500/30 border-b-pink-500 rounded-full animate-spin"
+            style={{ animationDirection: "reverse" }}
+          ></div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated || !user) {
+    router.push("/")
+    return null
+  }
+
   const generateFlashcards = async () => {
-    if (!topic.trim()) return
+    if (!topic.trim()) {
+      toast.error("Please enter a topic")
+      return
+    }
 
     setIsGenerating(true)
     try {
@@ -99,425 +175,602 @@ export default function FlashCardPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ topic }),
+        body: JSON.stringify({ topic: topic.trim(), count }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || `HTTP error! status: ${response.status}`)
+        throw new Error(data.error || "Failed to generate flashcards")
       }
 
-      setFlashcards(data.flashcards)
-      setCurrentCardIndex(0)
-      setFlippedCards({})
+      const newFlashcardSet: FlashcardSet = {
+        id: `set-${Date.now()}`,
+        topic: topic.trim(),
+        flashcards: data.flashcards,
+        createdAt: new Date().toISOString(),
+        count: data.flashcards.length,
+      }
+
+      setCurrentFlashcards(data.flashcards)
+      setHistory((prev) => [newFlashcardSet, ...prev])
+      setSelectedSet(newFlashcardSet)
+      toast.success(`Generated ${data.flashcards.length} flashcards!`)
     } catch (error) {
       console.error("Error generating flashcards:", error)
-
-      // Show user-friendly error message
-      alert(
-        `Error: ${error instanceof Error ? error.message : "Failed to generate flashcards. Please check your API key and try again."}`,
-      )
+      toast.error(error instanceof Error ? error.message : "Failed to generate flashcards")
     } finally {
       setIsGenerating(false)
     }
   }
 
-  const handleCardFlip = (cardId: string) => {
-    setFlippedCards((prev) => ({
-      ...prev,
-      [cardId]: !prev[cardId],
-    }))
-  }
-
-  const nextCard = () => {
-    if (currentCardIndex < flashcards.length - 1) {
-      setCurrentCardIndex(currentCardIndex + 1)
+  const deleteFromHistory = (setId: string) => {
+    setHistory((prev) => prev.filter((set) => set.id !== setId))
+    if (selectedSet?.id === setId) {
+      setSelectedSet(null)
+      setCurrentFlashcards([])
     }
+    toast.success("Flashcard set deleted")
   }
 
-  const prevCard = () => {
-    if (currentCardIndex > 0) {
-      setCurrentCardIndex(currentCardIndex - 1)
-    }
+  const viewFlashcardSet = (set: FlashcardSet) => {
+    setSelectedSet(set)
+    setCurrentFlashcards(set.flashcards)
+    setShowHistory(false)
   }
 
-  const resetCards = () => {
-    setFlashcards([])
-    setTopic("")
-    setCurrentCardIndex(0)
-    setFlippedCards({})
-  }
-
-  const startListening = () => {
-    if (recognition) {
-      setIsListening(true)
-      setTranscript("")
-      recognition.start()
-    } else {
-      alert("Speech recognition is not supported in your browser")
-    }
-  }
-
-  const stopListening = () => {
-    if (recognition) {
-      recognition.stop()
-      setIsListening(false)
-    }
-  }
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file && file.type === "text/plain") {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const content = e.target?.result as string
-        setTopic(content.substring(0, 500)) // Limit to 500 characters
+  const clearAllHistory = () => {
+    if (confirm("Are you sure you want to clear all flashcard history?")) {
+      setHistory([])
+      setCurrentFlashcards([])
+      setSelectedSet(null)
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("flashcard-history")
       }
-      reader.readAsText(file)
-    } else {
-      alert("Please upload a text file (.txt)")
+      toast.success("History cleared")
     }
   }
 
-  const currentCard = flashcards[currentCardIndex]
-  const isFlipped = flippedCards[currentCard?.id] || false
+  const markCardAsCompleted = (index: number) => {
+    setCompletedCards(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(index)) {
+        newSet.delete(index)
+      } else {
+        newSet.add(index)
+      }
+      return newSet
+    })
+  }
 
   return (
-    <div className="min-h-screen bg-black text-white relative overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gray-500/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gray-500/5 rounded-full blur-3xl animate-pulse delay-500" />
-      </div>
-
-      {/* Subtle Grid Pattern */}
-      <div className="absolute inset-0 opacity-[0.02]">
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fillOpacity='0.1'%3E%3Cpath d='M20 20.5V18H18v2.5h-2.5V22H18v2.5h2V22h2.5v-1.5H20z'/%3E%3C/g%3E%3C/svg%3E")`,
-          }}
-        />
-      </div>
-
-      {/* Header Section */}
-      <div className="relative z-10 py-16 text-center">
-        <div className="flex items-center justify-center mb-8">
-          <div className="relative">
-            <GraduationCap className="h-16 w-16 mr-6 text-white" />
-            <div className="absolute inset-0 h-16 w-16 mr-6 bg-white opacity-20 blur-xl" />
-          </div>
-          <div className="relative">
-            <h1 className="text-7xl font-black text-white tracking-tight">अध्ययन</h1>
-          </div>
+    <div className="min-h-screen relative overflow-hidden">
+      <WavyBackground className="min-h-screen">
+        {/* Gyan Points Display */}
+        <div className="fixed top-4 right-4 z-50">
+          <GyanPointsDisplay />
         </div>
 
-        <div className="relative inline-block">
-          <h2 className="text-3xl font-bold text-slate-300 mb-6 tracking-wide">Smart Flashcards</h2>
-          <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-24 h-1 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full" />
-        </div>
-
-        <div className="mt-8 flex flex-col items-center">
-          <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 backdrop-blur-sm rounded-full border border-gray-700">
-            <Stars className="h-4 w-4 text-white animate-pulse" />
-            <span className="text-sm font-medium bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-              Powered by Gemini AI
-            </span>
+        {/* Main Container */}
+        <div className="container mx-auto px-4 py-6 max-w-7xl relative z-10">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+              <Button
+                isIconOnly
+                variant="ghost"
+                onClick={() => router.push("/dashboard")}
+                className="text-white hover:bg-white/10 transition-all duration-200 hover:scale-105"
+                size="lg"
+              >
+                <IconArrowLeft className="w-6 h-6" />
+              </Button>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl backdrop-blur-sm border border-white/10">
+                  <IconCards className="w-8 h-8 text-white" />
+                </div>
+                <div>                  <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                    Flashcards
+                  </h1>
+                  <p className="text-white/70 text-sm md:text-base">AI-powered learning cards</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant={showHistory ? "solid" : "ghost"}
+                onClick={() => setShowHistory(!showHistory)}
+                className={
+                  showHistory
+                    ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg"
+                    : "text-white hover:bg-white/10 border border-white/20"
+                }
+                startContent={<IconHistory className="w-4 h-4" />}
+                size="lg"
+              >
+                History ({history.length})
+              </Button>
+              {history.length > 0 && (
+                <Button
+                  variant="ghost"
+                  onClick={clearAllHistory}
+                  className="text-red-400 hover:bg-red-500/10 border border-red-500/20 hover:border-red-500/40 transition-all duration-200"
+                  startContent={<IconTrash className="w-4 h-4" />}
+                  size="lg"
+                >
+                  Clear All
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div className="relative z-10 container mx-auto px-4 pb-16">
-        <div className="max-w-5xl mx-auto">
-          {/* Topic Input Section */}
-          {flashcards.length === 0 && (
-            <Card className="bg-gray-900/50 border-gray-800 backdrop-blur-xl mb-12 shadow-2xl hover:bg-gray-900/70 transition-all duration-500">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-white text-3xl flex items-center font-bold">
-                  <Lightbulb className="h-8 w-8 mr-3 text-blue-400" />
-                  Create Your Flashcards
-                </CardTitle>
-                <p className="text-slate-300 text-lg mt-2">
-                  Enter any topic and let AI generate personalized study cards for you
-                </p>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="space-y-6">
-                  <div className="space-y-3">
-                    <Label htmlFor="topic" className="text-slate-200 text-lg font-medium">
-                      What would you like to study?
-                    </Label>
-                    <div className="relative">
-                      <Input
-                        id="topic"
-                        value={topic}
-                        onChange={(e) => setTopic(e.target.value)}
-                        placeholder="e.g., JavaScript fundamentals, World War II, Photosynthesis, Machine Learning..."
-                        className="bg-black/20 border-white/20 text-white placeholder:text-slate-400 focus:border-purple-400 focus:ring-purple-400/50 h-14 text-lg px-6 pr-32 rounded-xl backdrop-blur-sm"
-                        onKeyPress={(e) => e.key === "Enter" && generateFlashcards()}
-                      />
-                      <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-500/10 to-blue-500/10 pointer-events-none" />
+          {/* Main Content */}
+          {showHistory ? (
+            <HistoryView history={history} onView={viewFlashcardSet} onDelete={deleteFromHistory} />
+          ) : (
+            <div className="grid lg:grid-cols-12 gap-6">
+              {/* Generation Panel */}
+              <div className="lg:col-span-3">
+                <Card className="bg-black/30 backdrop-blur-xl border border-white/10 shadow-xl hover:shadow-2xl transition-all duration-300 hover:border-white/20 h-fit mb-6">
+                  <CardBody className="p-6">
+                    <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3">
+                      <div className="p-2 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg">
+                        <IconBrain className="w-5 h-5" />
+                      </div>
+                      Generate Flashcards
+                    </h2>
 
-                      {/* Voice and Upload Controls */}
-                      <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex gap-2">
-                        {/* File Upload */}
-                        <div className="relative">
-                          <input
-                            type="file"
-                            accept=".txt"
-                            onChange={handleFileUpload}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                            title="Upload syllabus file"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-10 w-10 p-0 bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 hover:text-white rounded-lg"
-                          >
-                            <Upload className="h-4 w-4" />
-                          </Button>
-                        </div>
-
-                        {/* Voice Input */}
-                        <Button
-                          type="button"
-                          onClick={isListening ? stopListening : startListening}
-                          variant="ghost"
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-white/90 text-sm font-medium block">Topic</label>
+                        <Input
+                          placeholder="Enter a topic"
+                          value={topic}
+                          onChange={(e) => setTopic(e.target.value)}
+                          classNames={{
+                            input: "text-white bg-transparent placeholder:text-white/40",
+                            inputWrapper:
+                              "border border-white/20 hover:border-white/40 focus-within:border-purple-500/60 bg-white/5 backdrop-blur-sm h-10 rounded-lg transition-all duration-200",
+                          }}
                           size="sm"
-                          className={`h-10 w-10 p-0 rounded-lg transition-all duration-300 ${
-                            isListening
-                              ? "bg-red-600/50 hover:bg-red-500/50 text-red-200 animate-pulse"
-                              : "bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 hover:text-white"
-                          }`}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-white/90 text-sm font-medium block">Number of Cards</label>
+                        <Input
+                          type="number"
+                          min="15"
+                          max="25"
+                          value={count.toString()}
+                          onChange={(e) => setCount(Math.max(15, Math.min(25, Number.parseInt(e.target.value) || 15)))}
+                          classNames={{
+                            input: "text-white bg-transparent",
+                            inputWrapper:
+                              "border border-white/20 hover:border-white/40 focus-within:border-purple-500/60 bg-white/5 backdrop-blur-sm h-10 rounded-lg transition-all duration-200",
+                          }}
+                          size="sm"
+                        />
+                      </div>
+
+                      <Button
+                        onClick={generateFlashcards}
+                        isLoading={isGenerating}
+                        disabled={!topic.trim() || isGenerating}
+                        className="w-full bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-semibold shadow-lg hover:shadow-gray-500/25 transition-all duration-200 hover:scale-[1.02] h-10"
+                        size="sm"
+                        startContent={!isGenerating && <IconPlus className="w-4 h-4" />}
+                      >
+                        {isGenerating ? "Generating..." : "Generate"}
+                      </Button>
+                    </div>
+
+                    {selectedSet && (
+                      <div className="mt-4 p-3 bg-gradient-to-br from-green-500/10 to-blue-500/10 rounded-xl border border-green-500/20 backdrop-blur-sm">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-white font-semibold text-sm">{selectedSet.topic}</h3>
+                            <p className="text-white/60 text-xs">
+                              {selectedSet.count} cards • {new Date(selectedSet.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <Chip color="success" variant="flat" size="sm">
+                            Current
+                          </Chip>
+                        </div>
+                      </div>
+                    )}
+                  </CardBody>
+                </Card>
+
+                {/* Progress Stats */}
+                {currentFlashcards.length > 0 && (
+                  <Card className="bg-black/30 backdrop-blur-xl border border-white/10 shadow-xl">
+                    <CardBody className="p-4">
+                      <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                        <IconStar className="w-4 h-4" />
+                        Progress
+                      </h3>
+                      <div className="space-y-3">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-white/70">Completed</span>
+                          <span className="text-white font-semibold">
+                            {completedCards.size}/{currentFlashcards.length}
+                          </span>
+                        </div>
+                        <div className="w-full bg-white/10 rounded-full h-2">
+                          <div
+                            className="bg-gradient-to-r from-green-500 to-blue-500 h-2 rounded-full transition-all duration-500"
+                            style={{ width: `${(completedCards.size / currentFlashcards.length) * 100}%` }}
+                          />
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setCompletedCards(new Set())}
+                          className="w-full text-white/60 hover:bg-white/10 hover:text-white"
+                          startContent={<IconRefresh className="w-4 h-4" />}
                         >
-                          {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                          Reset Progress
                         </Button>
                       </div>
-                    </div>
+                    </CardBody>
+                  </Card>
+                )}
+              </div>
 
-                    {/* Voice Recording Indicator */}
-                    {isListening && (
-                      <div className="flex items-center gap-2 text-sm text-red-300 bg-red-900/20 px-3 py-2 rounded-lg border border-red-800/50">
-                        <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
-                        Recording... Speak your syllabus content
+              {/* Flashcards List */}
+              <div className="lg:col-span-4">
+                {currentFlashcards.length > 0 ? (
+                  <FlashcardsList
+                    flashcards={currentFlashcards}
+                    selectedIndex={selectedCardIndex}
+                    onSelect={setSelectedCardIndex}
+                    completedCards={completedCards}
+                    onToggleComplete={markCardAsCompleted}
+                  />
+                ) : (
+                  <Card className="bg-black/30 backdrop-blur-xl border border-white/10 h-full shadow-xl min-h-[500px]">
+                    <CardBody className="flex items-center justify-center p-8">
+                      <div className="text-center">
+                        <div className="p-6 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-full w-fit mx-auto mb-4">
+                          <IconCards className="w-12 h-12 text-white/30" />
+                        </div>
+                        <h3 className="text-xl font-semibold text-white mb-2">No Flashcards Yet</h3>
+                        <p className="text-white/60">
+                          Generate flashcards or select from history to get started
+                        </p>
                       </div>
-                    )}
-
-                    {/* Instructions */}
-                    <div className="text-xs text-slate-400 space-y-1">
-                      <p>
-                        💡 <strong>Voice Input:</strong> Click the microphone to speak your syllabus content
-                      </p>
-                      <p>
-                        📄 <strong>File Upload:</strong> Click the upload icon to select a .txt file with your syllabus
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={generateFlashcards}
-                    disabled={isGenerating || !topic.trim()}
-                    className="w-full h-14 bg-gray-800 hover:bg-gray-700 text-white border border-gray-600 disabled:opacity-50 text-lg font-semibold rounded-xl shadow-lg hover:shadow-gray-500/25 transition-all duration-300 transform hover:scale-[1.02]"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <Loader2 className="h-5 w-5 mr-3 animate-spin" />
-                        Generating Your Flashcards...
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="h-5 w-5 mr-3" />
-                        Generate Flashcards
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Flashcard Display */}
-          {flashcards.length > 0 && currentCard && (
-            <div className="space-y-8">
-              {/* Progress Section */}
-              <div className="flex items-center justify-between bg-gray-900/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-800">
-                <div className="flex items-center gap-4">
-                  <div className="text-2xl font-bold text-white">
-                    {currentCardIndex + 1}
-                    <span className="text-slate-400 font-normal">/{flashcards.length}</span>
-                  </div>
-                  <div className="text-slate-300">
-                    Progress: {Math.round(((currentCardIndex + 1) / flashcards.length) * 100)}%
-                  </div>
-                </div>
-                <Button
-                  onClick={resetCards}
-                  variant="outline"
-                  className="bg-white/10 hover:bg-white/20 text-white border-white/20 hover:border-white/30 rounded-xl px-6 py-3 font-medium transition-all duration-300"
-                >
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  New Topic
-                </Button>
+                    </CardBody>
+                  </Card>
+                )}
               </div>
 
-              {/* Enhanced Progress Bar */}
-              <div className="relative w-full bg-white/10 rounded-full h-3 overflow-hidden">
-                <div
-                  className="bg-gradient-to-r from-purple-500 to-blue-500 h-3 rounded-full transition-all duration-700 ease-out relative overflow-hidden"
-                  style={{
-                    width: `${((currentCardIndex + 1) / flashcards.length) * 100}%`,
-                  }}
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse" />
-                </div>
-              </div>
-
-              {/* Enhanced Flip Card */}
-              <div className="flex justify-center">
-                <div className="w-full max-w-3xl">
-                  <div className="relative w-full h-96 perspective-1000">
-                    {/* Question Card */}
-                    <div
-                      className={`absolute inset-0 w-full h-full transition-all duration-700 ease-in-out cursor-pointer transform-style-preserve-3d ${
-                        isFlipped
-                          ? "opacity-0 scale-95 rotate-y-180 pointer-events-none"
-                          : "opacity-100 scale-100 rotate-y-0"
-                      }`}
-                      onClick={() => handleCardFlip(currentCard.id)}
-                    >
-                      <Card className="w-full h-full bg-gradient-to-br from-blue-900/90 via-blue-800/90 to-blue-700/90 border-blue-700 backdrop-blur-xl hover:from-blue-800/90 hover:via-blue-700/90 hover:to-blue-600/90 transition-all duration-500 shadow-2xl hover:shadow-blue-500/20 rounded-3xl group">
-                        <CardContent className="p-10 h-full flex flex-col justify-center items-center text-center relative overflow-hidden">
-                          {/* Animated Background */}
-                          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-indigo-500/5 group-hover:from-blue-500/10 group-hover:via-purple-500/10 group-hover:to-indigo-500/10 transition-all duration-500" />
-
-                          {/* Question Badge */}
-                          <div className="absolute top-8 left-8">
-                            <div className="bg-blue-500/20 text-blue-200 px-4 py-2 rounded-full text-sm font-bold border border-blue-400/50 backdrop-blur-sm">
-                              QUESTION
-                            </div>
-                          </div>
-
-                          {/* Flip Icon */}
-                          <div className="absolute top-8 right-8">
-                            <div className="p-2 bg-white/10 rounded-full backdrop-blur-sm">
-                              <FlipVertical className="h-6 w-6 text-blue-300 group-hover:animate-spin" />
-                            </div>
-                          </div>
-
-                          {/* Question Content */}
-                          <div className="flex-1 flex items-center justify-center px-6 relative z-10">
-                            <p className="text-3xl text-white leading-relaxed font-semibold text-center max-w-2xl">
-                              {currentCard.question}
-                            </p>
-                          </div>
-
-                          {/* Enhanced Hint */}
-                          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
-                            <div className="flex items-center gap-3 px-4 py-2 bg-white/10 rounded-full backdrop-blur-sm border border-white/20">
-                              <div className="flex gap-1">
-                                <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></span>
-                                <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse delay-100"></span>
-                                <span className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse delay-200"></span>
-                              </div>
-                              <p className="text-sm text-blue-200 font-medium">Click to reveal answer</p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Answer Card */}
-                    <div
-                      className={`absolute inset-0 w-full h-full transition-all duration-700 ease-in-out cursor-pointer transform-style-preserve-3d ${
-                        isFlipped
-                          ? "opacity-100 scale-100 rotate-y-0"
-                          : "opacity-0 scale-95 rotate-y-180 pointer-events-none"
-                      }`}
-                      onClick={() => handleCardFlip(currentCard.id)}
-                    >
-                      <Card className="w-full h-full bg-gradient-to-br from-green-900/90 via-emerald-800/90 to-green-700/90 border-green-700 backdrop-blur-xl hover:from-green-800/90 hover:via-emerald-700/90 hover:to-green-600/90 transition-all duration-500 shadow-2xl hover:shadow-green-500/20 rounded-3xl group">
-                        <CardContent className="p-10 h-full flex flex-col justify-center items-center text-center relative overflow-hidden">
-                          {/* Animated Background */}
-                          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-green-500/5 to-teal-500/5 group-hover:from-emerald-500/10 group-hover:via-green-500/10 group-hover:to-teal-500/10 transition-all duration-500" />
-
-                          {/* Answer Badge */}
-                          <div className="absolute top-8 left-8">
-                            <div className="bg-emerald-500/20 text-emerald-200 px-4 py-2 rounded-full text-sm font-bold border border-emerald-400/50 backdrop-blur-sm">
-                              ANSWER
-                            </div>
-                          </div>
-
-                          {/* Flip Icon */}
-                          <div className="absolute top-8 right-8">
-                            <div className="p-2 bg-white/10 rounded-full backdrop-blur-sm">
-                              <FlipVertical className="h-6 w-6 text-emerald-300 group-hover:animate-spin" />
-                            </div>
-                          </div>
-
-                          {/* Answer Content */}
-                          <div className="flex-1 flex items-center justify-center px-6 relative z-10">
-                            <p className="text-2xl text-white leading-relaxed text-center max-w-2xl font-medium">
-                              {currentCard.answer}
-                            </p>
-                          </div>
-
-                          {/* Enhanced Hint */}
-                          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
-                            <div className="flex items-center gap-3 px-4 py-2 bg-white/10 rounded-full backdrop-blur-sm border border-white/20">
-                              <div className="flex gap-1">
-                                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-                                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse delay-100"></span>
-                                <span className="w-2 h-2 bg-teal-400 rounded-full animate-pulse delay-200"></span>
-                              </div>
-                              <p className="text-sm text-emerald-200 font-medium">Click to see question</p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Enhanced Navigation Controls */}
-              <div className="flex justify-center items-center space-x-6">
-                <Button
-                  onClick={prevCard}
-                  disabled={currentCardIndex === 0}
-                  variant="outline"
-                  className="bg-gray-800 hover:bg-gray-700 text-white border-gray-600 hover:border-gray-500 disabled:opacity-30 rounded-xl px-8 py-4 font-semibold text-lg transition-all duration-300 transform hover:scale-105 disabled:hover:scale-100"
-                >
-                  <ArrowLeftCircle className="h-5 w-5 mr-2" />
-                  Previous
-                </Button>
-
-                <div className="flex items-center gap-2 px-6 py-3 bg-gray-900/50 rounded-xl border border-gray-800">
-                  {flashcards.map((_, index) => (
-                    <div
-                      key={index}
-                      className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                        index === currentCardIndex ? "bg-blue-500 scale-125" : "bg-gray-600 hover:bg-gray-500"
-                      }`}
-                    />
-                  ))}
-                </div>
-
-                <Button
-                  onClick={nextCard}
-                  disabled={currentCardIndex === flashcards.length - 1}
-                  variant="outline"
-                  className="bg-gray-800 hover:bg-gray-700 text-white border-gray-600 hover:border-gray-500 disabled:opacity-30 rounded-xl px-8 py-4 font-semibold text-lg transition-all duration-300 transform hover:scale-105 disabled:hover:scale-100"
-                >
-                  Next
-                  <ArrowRightCircle className="h-5 w-5 ml-2" />
-                </Button>
+              {/* Flashcard Viewer */}
+              <div className="lg:col-span-5">
+                {currentFlashcards.length > 0 ? (
+                  <FlashcardViewer
+                    flashcard={currentFlashcards[selectedCardIndex]}
+                    cardIndex={selectedCardIndex}
+                    totalCards={currentFlashcards.length}
+                    isCompleted={completedCards.has(selectedCardIndex)}
+                    onToggleComplete={() => markCardAsCompleted(selectedCardIndex)}
+                  />
+                ) : (
+                  <Card className="bg-black/30 backdrop-blur-xl border border-white/10 h-full shadow-xl min-h-[500px]">
+                    <CardBody className="flex items-center justify-center p-8">
+                      <div className="text-center">
+                        <div className="p-6 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-full w-fit mx-auto mb-4">
+                          <IconFlipVertical className="w-12 h-12 text-white/30" />
+                        </div>
+                        <h3 className="text-xl font-semibold text-white mb-2">Select a Flashcard</h3>
+                        <p className="text-white/60">
+                          Choose a flashcard from the list to view it here
+                        </p>
+                      </div>
+                    </CardBody>
+                  </Card>                )}
               </div>
             </div>
           )}
         </div>
-      </div>
+
+        {/* Floating Dock positioned like macOS taskbar */}
+        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+          <FloatingDock
+            mobileClassName="translate-y-20"
+            items={dockLinks}
+            activeItem="/flashCard"
+          />
+        </div>
+      </WavyBackground>
+    </div>
+  )
+}
+
+// Flashcards List Component
+function FlashcardsList({
+  flashcards,
+  selectedIndex,
+  onSelect,
+  completedCards,
+  onToggleComplete,
+}: {
+  flashcards: Flashcard[]
+  selectedIndex: number
+  onSelect: (index: number) => void
+  completedCards: Set<number>
+  onToggleComplete: (index: number) => void
+}) {
+  return (
+    <Card className="bg-black/30 backdrop-blur-xl border border-white/10 shadow-xl h-full">
+      <CardBody className="p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-white">Flashcards</h2>
+          <Chip color="primary" variant="flat" size="sm">
+            {flashcards.length} cards
+          </Chip>
+        </div>
+        
+        <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2">
+          {flashcards.map((flashcard, index) => (
+            <Card
+              key={flashcard.id || index}
+              className={`cursor-pointer transition-all duration-200 hover:scale-[1.02] ${
+                selectedIndex === index
+                  ? "bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-purple-500/40"
+                  : "bg-white/5 hover:bg-white/10 border-white/10 hover:border-white/20"
+              }`}
+              isPressable
+              onPress={() => onSelect(index)}
+            >
+              <CardBody className="p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-semibold text-purple-300 bg-purple-500/20 px-2 py-1 rounded">
+                        #{index + 1}
+                      </span>
+                      {completedCards.has(index) && (
+                        <IconCheck className="w-4 h-4 text-green-400" />
+                      )}
+                    </div>
+                    <p className="text-white/90 text-sm font-medium line-clamp-2 leading-relaxed">
+                      {flashcard.question}
+                    </p>
+                  </div>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onToggleComplete(index)
+                    }}
+                    className={`min-w-unit-6 w-6 h-6 ${
+                      completedCards.has(index)
+                        ? "text-green-400 hover:bg-green-500/20"
+                        : "text-white/40 hover:bg-white/10 hover:text-white/60"
+                    }`}
+                  >
+                    <IconCheck className="w-3 h-3" />
+                  </Button>
+                </div>
+              </CardBody>
+            </Card>
+          ))}
+        </div>
+      </CardBody>
+    </Card>
+  )
+}
+
+// Single Flashcard Viewer Component
+function FlashcardViewer({
+  flashcard,
+  cardIndex,
+  totalCards,
+  isCompleted,
+  onToggleComplete,
+}: {
+  flashcard: Flashcard
+  cardIndex: number
+  totalCards: number
+  isCompleted: boolean
+  onToggleComplete: () => void
+}) {
+  const [isFlipped, setIsFlipped] = useState(false)
+
+  // Reset flip state when card changes
+  useEffect(() => {
+    setIsFlipped(false)
+  }, [cardIndex])
+
+  return (
+    <Card className="bg-black/30 backdrop-blur-xl border border-white/10 shadow-xl h-full">
+      <CardBody className="p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold text-white">Card {cardIndex + 1} of {totalCards}</h2>
+            {isCompleted && (
+              <Chip color="success" variant="flat" size="sm" startContent={<IconCheck className="w-3 h-3" />}>
+                Completed
+              </Chip>
+            )}
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onToggleComplete}
+            className={`${
+              isCompleted
+                ? "text-green-400 hover:bg-green-500/20"
+                : "text-white/60 hover:bg-white/10 hover:text-white"
+            }`}
+            startContent={<IconCheck className="w-4 h-4" />}
+          >
+            {isCompleted ? "Completed" : "Mark Complete"}
+          </Button>
+        </div>
+
+        {/* Flashcard */}
+        <div
+          className="relative h-[400px] w-full mb-6"
+          style={{ perspective: "1000px" }}
+        >
+          <div
+            className="absolute inset-0 w-full h-full transition-all duration-700 ease-in-out cursor-pointer"
+            style={{
+              transformStyle: "preserve-3d",
+              transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
+            }}
+            onClick={() => setIsFlipped(!isFlipped)}
+          >
+            {/* Front (Question) */}
+            <Card
+              className="absolute inset-0 w-full h-full bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/30 hover:border-blue-500/50 transition-all duration-300"
+              style={{ backfaceVisibility: "hidden" }}
+            >
+              <CardBody className="flex items-center justify-center p-8 text-center h-full">
+                <div>
+                  <div className="mb-4">
+                    <Chip color="primary" variant="flat" size="sm">
+                      Question
+                    </Chip>
+                  </div>
+                  <p className="text-white text-lg font-medium leading-relaxed">
+                    {flashcard.question}
+                  </p>
+                </div>
+              </CardBody>
+            </Card>
+
+            {/* Back (Answer) */}
+            <Card
+              className="absolute inset-0 w-full h-full bg-gradient-to-br from-green-500/10 to-teal-500/10 border border-green-500/30 hover:border-green-500/50 transition-all duration-300"
+              style={{
+                backfaceVisibility: "hidden",
+                transform: "rotateY(180deg)",
+              }}
+            >
+              <CardBody className="flex items-center justify-center p-8 text-center h-full">
+                <div>
+                  <div className="mb-4">
+                    <Chip color="success" variant="flat" size="sm">
+                      Answer
+                    </Chip>
+                  </div>
+                  <p className="text-white text-xl font-semibold leading-relaxed">
+                    {flashcard.answer}
+                  </p>
+                </div>
+              </CardBody>
+            </Card>
+          </div>
+        </div>
+
+        {/* Flip Button */}
+        <Button
+          onClick={() => setIsFlipped(!isFlipped)}
+          className="w-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-white hover:from-purple-500/30 hover:to-pink-500/30 border border-purple-500/30 hover:border-purple-500/50 backdrop-blur-sm transition-all duration-200 hover:scale-[1.02] h-12 font-semibold"
+          size="lg"
+          startContent={<IconFlipVertical className="w-5 h-5" />}
+        >
+          {isFlipped ? "Show Question" : "Show Answer"}
+        </Button>
+      </CardBody>
+    </Card>
+  )
+}
+
+// History View Component (unchanged)
+function HistoryView({
+  history,
+  onView,
+  onDelete,
+}: {
+  history: FlashcardSet[]
+  onView: (set: FlashcardSet) => void
+  onDelete: (setId: string) => void
+}) {
+  if (history.length === 0) {
+    return (
+      <Card className="bg-black/30 backdrop-blur-xl border border-white/10 shadow-xl">
+        <CardBody className="flex items-center justify-center p-16">
+          <div className="text-center">
+            <div className="p-6 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-full w-fit mx-auto mb-6 hover:scale-110 transition-transform duration-300">
+              <IconHistory className="w-16 h-16 text-white/30" />
+            </div>
+            <h3 className="text-2xl font-semibold text-white mb-3">No History Yet</h3>
+            <p className="text-white/60 text-lg">Generate some flashcards to see them here</p>
+          </div>
+        </CardBody>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {history.map((set, index) => (
+        <Card
+          key={set.id}
+          className="bg-black/30 backdrop-blur-xl border border-white/10 hover:bg-black/40 transition-all duration-300 hover:scale-[1.03] hover:shadow-2xl shadow-lg hover:border-white/30 group cursor-pointer"
+          style={{
+            animationDelay: `${index * 100}ms`,
+          }}
+        >
+          <CardBody className="p-6">
+            <div className="flex items-start justify-between mb-4">
+              <h3 className="text-white font-semibold text-lg truncate pr-2 group-hover:text-purple-300 transition-colors duration-200">
+                {set.topic}
+              </h3>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="ghost"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete(set.id)
+                }}
+                className="text-red-400 hover:bg-red-500/20 hover:text-red-300 min-w-unit-8 w-8 h-8 hover:scale-110 transition-all duration-200"
+              >
+                <IconTrash className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center gap-2">
+                <Chip
+                  size="sm"
+                  color="primary"
+                  variant="flat"
+                  className="font-semibold group-hover:scale-105 transition-transform duration-200"
+                >
+                  {set.count} cards
+                </Chip>
+              </div>
+              <p className="text-white/60 text-sm group-hover:text-white/80 transition-colors duration-200">
+                Created:{" "}
+                {new Date(set.createdAt).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </p>
+            </div>
+
+            <Button
+              onClick={() => onView(set)}
+              className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold shadow-lg hover:shadow-blue-500/25 transition-all duration-200 hover:scale-[1.02] group-hover:from-blue-400 group-hover:to-purple-400"
+              startContent={<IconEye className="w-4 h-4" />}
+              size="lg"
+            >
+              View Cards
+            </Button>
+          </CardBody>
+        </Card>
+      ))}
     </div>
   )
 }
