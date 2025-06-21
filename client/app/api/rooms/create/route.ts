@@ -10,12 +10,15 @@ interface Participant {
   userId: string;
   userName: string;
   joinedAt: Date;
+  lastActivity: Date;
   score: number;
   correctAnswers: number;
   averageResponseTime: number;
   isReady: boolean;
   currentQuestionIndex: number;
   isFinished: boolean;
+  timeExtensions?: number;
+  lastExtensionAt?: Date;
 }
 
 interface Room {
@@ -33,12 +36,22 @@ interface Room {
   questions: any[];
   participants: Participant[];
   createdAt: any;
+  lastActivity: Date;
+  autoDeleteAt: Date;
+  isPublic: boolean;
   settings: {
     questionCount: number;
     timePerQuestion: number;
     showExplanations: boolean;
   };
   participantAnswers: Record<string, Record<string, any>>;
+  extensionHistory: Array<{
+    userId: string;
+    userName: string;
+    extendedAt: Date;
+    extensionNumber: number;
+    newTimeout: Date;
+  }>;
 }
 
 function generateRoomCode(): string {
@@ -188,7 +201,8 @@ export async function POST(request: NextRequest) {
       maxParticipants = 8,
       hostId,
       hostName,
-      timePerQuestion = 30
+      timePerQuestion = 30,
+      isPublic = true
     } = body;
 
     // Validate required fields
@@ -237,12 +251,14 @@ export async function POST(request: NextRequest) {
       userId: hostId,
       userName: hostName,
       joinedAt: new Date(),
+      lastActivity: new Date(),
       score: 0,
       correctAnswers: 0,
       averageResponseTime: 0,
       isReady: true,
       currentQuestionIndex: 0,
-      isFinished: false
+      isFinished: false,
+      timeExtensions: 0
     };
 
     // Create room object
@@ -261,12 +277,16 @@ export async function POST(request: NextRequest) {
       questions,
       participants: [hostParticipant],
       createdAt: serverTimestamp(),
+      lastActivity: new Date(),
+      autoDeleteAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes from now
+      isPublic,
       settings: {
         questionCount,
         timePerQuestion: timePerQuestion || (difficulty === 'easy' ? 30 : difficulty === 'medium' ? 25 : 20),
         showExplanations: true
       },
-      participantAnswers: {}
+      participantAnswers: {},
+      extensionHistory: []
     };
 
     // Store room in Firebase Firestore

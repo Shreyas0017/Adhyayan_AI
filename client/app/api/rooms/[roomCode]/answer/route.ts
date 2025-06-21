@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { doc, getDoc, updateDoc, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, runTransaction, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export async function POST(
@@ -116,9 +116,22 @@ export async function POST(
           totalPrize: room.prizePool,
           completedAt: new Date()
         };
-      }
 
-      transaction.update(roomRef, updateData);
+        // Update the room first with results
+        transaction.update(roomRef, updateData);
+
+        // Schedule room deletion after 5 minutes to allow users to see results
+        setTimeout(async () => {
+          try {
+            await deleteDoc(roomRef);
+            console.log(`Room ${roomCode} deleted after quiz completion`);
+          } catch (error) {
+            console.error(`Failed to delete room ${roomCode}:`, error);
+          }
+        }, 5 * 60 * 1000); // 5 minutes
+      } else {
+        transaction.update(roomRef, updateData);
+      }
 
       return {
         success: true,
