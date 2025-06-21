@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
+import { FloatingDock } from "@/components/ui/floating-dock";
 import { WavyBackground } from "@/components/ui/wavy-background";
 import BlackHoleLoader from "@/components/ui/black-hole-loader";
 import { GyanPointsDisplay } from "@/components/custom/GyanPointsDisplay";
@@ -10,16 +11,83 @@ import {
   IconUsers,
   IconLoader2,
   IconAlertCircle,
-  IconSearch
+  IconSearch,
+  IconHome,
+  IconBrain,
+  IconSettings,
+  IconLogout,
+  IconMap,
+  IconList,
 } from "@tabler/icons-react";
 
 export default function JoinRoom() {
-  const { user, loading, isAuthenticated } = useAuth();
+  const { user, loading, isAuthenticated, logout } = useAuth();
   const router = useRouter();
   
   const [roomCode, setRoomCode] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleSignOut = async () => {
+    try {
+      await logout();
+      router.push('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+  const dockLinks = [
+    {
+      title: "Home",
+      icon: (
+        <IconHome className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/",
+    },
+    {
+      title: "Dashboard",
+      icon: (
+        <IconBrain className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/dashboard",
+    },
+    {
+      title: "Quiz",
+      icon: (
+        <IconUsers className="h-full w-full text-red-400 dark:text-red-400" />
+      ),
+      href: "/create-room",
+    },
+    {
+      title: "Mind Map",
+      icon: (
+        <IconMap className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/mind-map",
+    },
+    {
+      title: "Flash Cards",
+      icon: (
+        <IconList className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/flashCard",
+    },
+    {
+      title: "Settings",
+      icon: (
+        <IconSettings className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/settings",
+    },
+    {
+      title: "Sign Out",
+      icon: (
+        <IconLogout className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "#",
+      onClick: handleSignOut,
+    },
+  ];
 
   const handleRoomCodeChange = (value: string) => {
     // Convert to uppercase and limit to 6 characters
@@ -218,9 +286,17 @@ export default function JoinRoom() {
                 className="text-blue-400 hover:text-blue-300 text-sm underline"
               >
                 Create your own room
-              </button>
-            </div>
+              </button>            </div>
           </div>
+        </div>
+
+        {/* Floating Dock positioned like macOS taskbar */}
+        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+          <FloatingDock
+            mobileClassName="translate-y-20"
+            items={dockLinks}
+            activeItem="/join-room"
+          />
         </div>
       </WavyBackground>
     </div>

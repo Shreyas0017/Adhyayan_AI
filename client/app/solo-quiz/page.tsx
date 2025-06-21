@@ -2,6 +2,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { FloatingDock } from "@/components/ui/floating-dock";
 import { WavyBackground } from "@/components/ui/wavy-background";
 import BlackHoleLoader from "@/components/ui/black-hole-loader";
 import { GyanPointsDisplay } from "@/components/custom/GyanPointsDisplay";
@@ -19,7 +20,13 @@ import {
   IconEdit,
   IconPlus,
   IconMinus,
-  IconHistory
+  IconHistory,
+  IconHome,
+  IconUsers,
+  IconSettings,
+  IconLogout,
+  IconMap,
+  IconList,
 } from "@tabler/icons-react";
 
 interface Question {
@@ -97,7 +104,7 @@ const DURATION_OPTIONS = [
 const QUESTION_COUNTS = [5, 10, 15, 20, 25];
 
 function QuizGameContent() {
-  const { user, loading, isAuthenticated } = useAuth();
+  const { user, loading, isAuthenticated, logout } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -131,7 +138,6 @@ function QuizGameContent() {
   
   // History state
   const [quizHistory, setQuizHistory] = useState<QuizHistory[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Check URL parameters for direct quiz start
   useEffect(() => {
@@ -377,6 +383,67 @@ function QuizGameContent() {
     setShowHistory(false);
     setShowSelection(true);
   };
+
+  const handleSignOut = async () => {
+    try {
+      await logout();
+      router.push('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+  const dockLinks = [
+    {
+      title: "Home",
+      icon: (
+        <IconHome className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/",
+    },
+    {
+      title: "Dashboard",
+      icon: (
+        <IconBrain className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/dashboard",
+    },
+    {
+      title: "Quiz",
+      icon: (
+        <IconUsers className="h-full w-full text-red-400 dark:text-red-400" />
+      ),
+      href: "/create-room",
+    },
+    {
+      title: "Mind Map",
+      icon: (
+        <IconMap className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/mind-map",
+    },
+    {
+      title: "Flash Cards",
+      icon: (
+        <IconList className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/flashCard",
+    },
+    {
+      title: "Settings",
+      icon: (
+        <IconSettings className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/settings",
+    },
+    {
+      title: "Sign Out",
+      icon: (
+        <IconLogout className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "#",
+      onClick: handleSignOut,
+    },
+  ];
 
   if (loading) {
     return (
@@ -1181,8 +1248,7 @@ function QuizGameContent() {
                   Score: {score}/{quizData.questions.length}
                 </span>
               </div>
-              
-              <div className="flex items-center gap-2 bg-white/10 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg">
+                <div className="flex items-center gap-2 bg-white/10 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg">
                 <IconTarget className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
                 <span className="text-white font-semibold text-xs sm:text-sm">
                   {Math.round((score / (currentQuestion + (isAnswered ? 1 : 0))) * 100) || 0}%
@@ -1190,6 +1256,15 @@ function QuizGameContent() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Floating Dock positioned like macOS taskbar */}
+        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+          <FloatingDock
+            mobileClassName="translate-y-20"
+            items={dockLinks}
+            activeItem="/solo-quiz"
+          />
         </div>
       </WavyBackground>
     </div>

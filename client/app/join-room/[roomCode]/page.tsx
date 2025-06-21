@@ -2,6 +2,7 @@
 import React, { useState, useEffect, use } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
+import { FloatingDock } from "@/components/ui/floating-dock";
 import { WavyBackground } from "@/components/ui/wavy-background";
 import BlackHoleLoader from "@/components/ui/black-hole-loader";
 import { GyanPointsDisplay } from "@/components/custom/GyanPointsDisplay";
@@ -11,7 +12,13 @@ import {
   IconLoader2,
   IconAlertCircle,
   IconCrown,
-  IconClock
+  IconClock,
+  IconHome,
+  IconBrain,
+  IconSettings,
+  IconLogout,
+  IconMap,
+  IconList,
 } from "@tabler/icons-react";
 
 interface JoinRoomProps {
@@ -22,12 +29,72 @@ export default function JoinRoomPage({ params }: JoinRoomProps) {
   // Unwrap the params Promise
   const resolvedParams = use(params);
   const { roomCode } = resolvedParams;
-  
-  const { user, loading, isAuthenticated } = useAuth();
+    const { user, loading, isAuthenticated, logout } = useAuth();
   const router = useRouter();
   const [room, setRoom] = useState<any>(null);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState('');
+
+  const handleSignOut = async () => {
+    try {
+      await logout();
+      router.push('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+  const dockLinks = [
+    {
+      title: "Home",
+      icon: (
+        <IconHome className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/",
+    },
+    {
+      title: "Dashboard",
+      icon: (
+        <IconBrain className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/dashboard",
+    },
+    {
+      title: "Quiz",
+      icon: (
+        <IconUsers className="h-full w-full text-red-400 dark:text-red-400" />
+      ),
+      href: "/create-room",
+    },
+    {
+      title: "Mind Map",
+      icon: (
+        <IconMap className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/mind-map",
+    },
+    {
+      title: "Flash Cards",
+      icon: (
+        <IconList className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/flashCard",
+    },
+    {
+      title: "Settings",
+      icon: (
+        <IconSettings className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/settings",
+    },
+    {
+      title: "Sign Out",
+      icon: (
+        <IconLogout className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "#",
+      onClick: handleSignOut,
+    },
+  ];
 
   useEffect(() => {
     if (isAuthenticated && roomCode) {
@@ -221,8 +288,15 @@ export default function JoinRoomPage({ params }: JoinRoomProps) {
                   Join Room (5 Gyan Coins)
                 </>
               )}
-            </button>
-          </div>
+            </button>          </div>
+        </div>
+
+        {/* Floating Dock positioned like macOS taskbar */}
+        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+          <FloatingDock
+            mobileClassName="translate-y-20"
+            items={dockLinks}
+          />
         </div>
       </WavyBackground>
     </div>
