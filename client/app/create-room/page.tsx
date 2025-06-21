@@ -183,25 +183,6 @@ export default function CreateRoom() {
             </div>
           </div>
 
-          {/* Stats Section */}
-          <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-6 w-full max-w-2xl">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-white">15K+</div>
-              <div className="text-neutral-400 text-sm">Solo Quizzes</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-white">8K+</div>
-              <div className="text-neutral-400 text-sm">Study Rooms</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-white">25K+</div>
-              <div className="text-neutral-400 text-sm">Active Users</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-white">98%</div>
-              <div className="text-neutral-400 text-sm">Success Rate</div>
-            </div>
-          </div>
 
           <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
             <FloatingDock
