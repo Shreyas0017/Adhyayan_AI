@@ -7,7 +7,7 @@ import { FloatingDock } from "@/components/ui/floating-dock";
 import { MindMapSidebar } from "@/components/custom/MindMapSidebar";
 import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-vanish-input";
 import { TextGenerateEffect } from "@/components/ui/text-generate-effect";
-import ContentFormatter from "@/components/ui/content-formatter";
+import { MultimediaContentDisplay } from "@/components/custom/MultimediaContentDisplay";
 import { cn } from "@/lib/utils";
 import { convertBackendDataToSidebarFormat, getFallbackData, generateFallbackMindMapData, BackendNode, BackendData, SidebarTopic, SidebarSubtopic } from "@/lib/mind-map-utils";
 import Head from 'next/head';
@@ -55,8 +55,11 @@ type CustomNodeData = {
   isRead?: boolean;
   parentNode?: string;
   isSelected?: boolean;
+  isExpanding?: boolean;
+  canExpand?: boolean; // For leaf nodes that can be expanded with AI
   onToggleReadStatus?: (nodeId: string) => void;
   onNodeClick?: (nodeId: string) => void;
+  onExpandNode?: (nodeId: string) => void;
 }
 
 // Custom node component for expandable/collapsible behavior
@@ -142,18 +145,41 @@ const CustomNode = ({ data, id }: NodeProps) => {
   const getBackgroundColor = () => {
     if (nodeData.isRoot) return "bg-neutral-900";
     return nodeData.isRead ? "bg-green-700" : "bg-neutral-900";
-  };
+  };  // Function to handle node expansion for leaf nodes
+  const handleExpandNode = useCallback(async () => {
+    if (nodeData.onExpandNode) {
+      nodeData.onExpandNode(id);
+    }
+  }, [nodeData, id]);
+
   return (
     <>
       {/* Expandable button for nodes with children */}
       {data.hasChildren && (
         <div 
-          className="absolute -left-6 top-1/2 transform -translate-y-1/2 w-5 h-5 rounded-full bg-neutral-800 flex items-center justify-center cursor-pointer"
+          className="absolute -left-6 top-1/2 transform -translate-y-1/2 w-5 h-5 rounded-full bg-neutral-800 flex items-center justify-center cursor-pointer hover:bg-neutral-700 transition-colors"
           onClick={toggleExpanded}
           style={{ zIndex: 10 }}
+          title={data.expanded ? "Collapse" : "Expand"}
         >
           {data.expanded ? (
             <IconMinus className="h-3 w-3 text-white" />
+          ) : (
+            <IconPlus className="h-3 w-3 text-white" />
+          )}
+        </div>
+      )}
+
+      {/* Expand button for leaf nodes (AI expansion) */}
+      {!data.hasChildren && data.canExpand && !nodeData.isRoot && (
+        <div 
+          className="absolute -right-6 top-1/2 transform -translate-y-1/2 w-5 h-5 rounded-full bg-orange-600 hover:bg-orange-500 flex items-center justify-center cursor-pointer transition-colors"
+          onClick={handleExpandNode}
+          style={{ zIndex: 10 }}
+          title="Deep dive into this topic (AI expansion)"
+        >
+          {data.isExpanding ? (
+            <IconLoader2 className="h-3 w-3 text-white animate-spin" />
           ) : (
             <IconPlus className="h-3 w-3 text-white" />
           )}
@@ -266,6 +292,9 @@ function MindMapContent() {
   const [expandedTopics, setExpandedTopics] = useState<string[]>(['central']);
   // Track selected/focused node
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  // Track AI-expanded nodes and their sub-nodes
+  const [expandedNodes, setExpandedNodes] = useState<Record<string, any[]>>({});
+  const [expandingNodes, setExpandingNodes] = useState<Set<string>>(new Set());
   // Track podcast generation state
   const [isGeneratingPodcast, setIsGeneratingPodcast] = useState(false);
   const [generatedPodcastUrl, setGeneratedPodcastUrl] = useState<string | null>(null);
@@ -275,9 +304,9 @@ function MindMapContent() {
   const [isResizing, setIsResizing] = useState(false);  // Track chat messages for AI interaction
   const [chatMessages, setChatMessages] = useState<Array<{id: string, type: 'user' | 'ai', content: string, timestamp: Date}>>([]);
   const [isAiTyping, setIsAiTyping] = useState(false);
-  
-  // Node descriptions state
+    // Node descriptions and multimedia content state
   const [nodeDescriptions, setNodeDescriptions] = useState<Record<string, string>>({});
+  const [nodeMultimedia, setNodeMultimedia] = useState<Record<string, any>>({});
   const [loadingDescription, setLoadingDescription] = useState<string | null>(null);
   
   // React Flow instance ref for controlling view
@@ -495,24 +524,30 @@ function MindMapContent() {
           if (localData) {
             const parsedData = JSON.parse(localData);
             if (parsedData && parsedData.nodes && parsedData.nodes.length > 0) {
-              console.log('Successfully loaded mind map from localStorage with', parsedData.nodes.length, 'nodes');
-                // Initialize the nodes data for React Flow
-              const reactFlowNodes = parsedData.nodes.map((node: BackendNode) => ({
-                id: node.id,
-                type: 'customNode',
-                position: node.position || { x: 0, y: 0 }, // Provide fallback position
-                data: {
-                  ...node,
-                  label: node.label,
-                  isRoot: node.type === 'root' || node.isRoot,
-                  expanded: node.type === 'root' || node.isRoot, // Start with root expanded
-                  hasChildren: (node.children && node.children.length > 0),
-                  isRead: false,
-                  onToggleReadStatus: handleToggleReadStatus,
-                  onNodeClick: handleNodeClick
-                },
-                hidden: node.type !== 'root' && !node.isRoot // All non-root nodes hidden initially
-              }));
+              console.log('Successfully loaded mind map from localStorage with', parsedData.nodes.length, 'nodes');              // Initialize the nodes data for React Flow
+              const reactFlowNodes = parsedData.nodes.map((node: BackendNode) => {
+                const isRoot = node.type === 'root' || node.isRoot;
+                const hasChildren = (node.children && node.children.length > 0);
+                
+                return {
+                  id: node.id,
+                  type: 'customNode',
+                  position: node.position || { x: 0, y: 0 }, // Provide fallback position
+                  data: {
+                    ...node,
+                    label: node.label,
+                    isRoot: isRoot,
+                    expanded: isRoot, // Start with root expanded
+                    hasChildren: hasChildren,
+                    canExpand: !isRoot && !hasChildren, // Leaf nodes (not root, no children) can be expanded
+                    isRead: false,
+                    isExpanding: false,
+                    onToggleReadStatus: handleToggleReadStatus,
+                    onNodeClick: handleNodeClick
+                  },
+                  hidden: !isRoot // All non-root nodes hidden initially
+                };
+              });
               
               setNodes(reactFlowNodes);
                 // Initialize the edges data for React Flow
@@ -594,7 +629,6 @@ function MindMapContent() {
     loadMindMapData();
   }, [params?.id]);
   // Using type definitions from mind-map-utils.ts  // Using convertBackendDataToSidebarFormat from mind-map-utils.ts  // Using getFallbackData from mind-map-utils.ts
-
   // Function to initialize React Flow data
   const initializeReactFlowData = (data: any) => {
     if (!data || !data.nodes || !Array.isArray(data.nodes)) {
@@ -604,22 +638,29 @@ function MindMapContent() {
     
     try {
       // Initialize the nodes data for React Flow
-      const reactFlowNodes = data.nodes.map((node: BackendNode) => ({
-        id: node.id,
-        type: 'customNode',
-        position: node.position || { x: 0, y: 0 }, // Provide fallback position
-        data: {
-          ...node,
-          label: node.label,
-          isRoot: node.type === 'root' || node.isRoot || node.level === 0,
-          expanded: node.type === 'root' || node.isRoot || node.level === 0, // Start with root expanded
-          hasChildren: (node.children && node.children.length > 0),
-          isRead: false,
-          onToggleReadStatus: handleToggleReadStatus,
-          onNodeClick: handleNodeClick
-        },
-        hidden: !(node.type === 'root' || node.isRoot || node.level === 0) // All non-root nodes hidden initially
-      }));
+      const reactFlowNodes = data.nodes.map((node: BackendNode) => {
+        const isRoot = node.type === 'root' || node.isRoot || node.level === 0;
+        const hasChildren = (node.children && node.children.length > 0);
+        
+        return {
+          id: node.id,
+          type: 'customNode',
+          position: node.position || { x: 0, y: 0 }, // Provide fallback position
+          data: {
+            ...node,
+            label: node.label,
+            isRoot: isRoot,
+            expanded: isRoot, // Start with root expanded
+            hasChildren: hasChildren,
+            canExpand: !isRoot && !hasChildren, // Leaf nodes (not root, no children) can be expanded
+            isRead: false,
+            isExpanding: false,
+            onToggleReadStatus: handleToggleReadStatus,
+            onNodeClick: handleNodeClick
+          },
+          hidden: !isRoot // All non-root nodes hidden initially
+        };
+      });
       
       setNodes(reactFlowNodes);
       
@@ -806,16 +847,12 @@ function MindMapContent() {
       setLoadingDescription(null);
     }
   }, [getNodes, nodeDescriptions, loadingDescription]);
-
   // Handle node click for selection and centering
   const handleNodeClick = useCallback((nodeId: string) => {
     console.log('Node clicked:', nodeId);
     
     // Set the selected node
     setSelectedNode(nodeId);
-    
-    // Fetch detailed description for this node
-    fetchNodeDescription(nodeId);
     
     // Find the node in the mind map and center on it
     const nodes = getNodes();
@@ -824,7 +861,7 @@ function MindMapContent() {
       // Center the view on the selected node with smooth animation
       setCenter(selectedNodeData.position.x, selectedNodeData.position.y, { zoom: getZoom(), duration: 800 });
     }
-  }, [getNodes, setCenter, getZoom, fetchNodeDescription]);  // Function to get content for selected node with AI-generated detailed theory
+  }, [getNodes, setCenter, getZoom]);// Function to get content for selected node with AI-generated detailed theory
   const getSelectedNodeContent = useCallback((nodeId: string | null) => {
     if (!nodeId || !backendData?.nodes) return null;
     
@@ -1432,11 +1469,11 @@ More detailed content will be available soon with comprehensive explanations, eq
         type: 'ai',
         content: "I'm sorry, I'm having trouble responding right now. Please try again.",
         timestamp: new Date()
-      }]);
-    } finally {
+      }]);    } finally {
       setIsAiTyping(false);
     }
   }, [selectedNode, nodeDescriptions]);
+
   // Create initial nodes and edges for React Flow from mind map data with hierarchical layout
   const initialNodes = useMemo(() => {
     const flowNodes: Node[] = [];    // Central node for the main topic - root node
@@ -1495,14 +1532,16 @@ More detailed content will be available soon with comprehensive explanations, eq
           flowNodes.push({
             id: subtopic.id,
             type: 'customNode',
-            position: { x: 900, y: subYPos },
-            data: { 
+            position: { x: 900, y: subYPos },            data: { 
               label: subtopic.title, 
               expanded: false,
               hasChildren: false,
+              canExpand: true, // Allow further expansion
+              isRoot: false,
+              isRead: false,
               parentNode: topic.id,
-              isRead: topicsReadStatus[subtopic.id],              
-              isSelected: selectedNode === subtopic.id,
+              level: subtopic.level || 1,
+              isSelected: false,
               onToggleReadStatus: handleToggleReadStatus,
               onNodeClick: handleNodeClick
             },
@@ -1511,9 +1550,7 @@ More detailed content will be available soon with comprehensive explanations, eq
           });
         });
       }
-    });
-
-    return flowNodes;
+    });    return flowNodes;
   }, [mindMapData, selectedNode, topicsReadStatus, handleToggleReadStatus, handleNodeClick]);
   // Create initial edges from the mindMapData structure
   const initialEdges = useMemo(() => {
@@ -1552,10 +1589,194 @@ More detailed content will be available soon with comprehensive explanations, eq
       });
     });    return flowEdges;
   }, []);  
-  
-  // Set up state hooks for nodes and edges
+    // Set up state hooks for nodes and edges
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Function to handle AI expansion of leaf nodes
+  const handleExpandNode = useCallback(async (nodeId: string) => {
+    if (expandingNodes.has(nodeId)) {
+      console.log('Node is already being expanded:', nodeId);
+      return;
+    }
+
+    try {
+      const mindMapId = params?.id as string;
+      if (!mindMapId) {
+        console.error('Mind map ID not available');
+        return;
+      }
+
+      // Add to expanding nodes set
+      setExpandingNodes(prev => new Set([...prev, nodeId]));
+
+      // Find the node to get its details
+      const currentNodes = getNodes();
+      const nodeData = currentNodes.find(node => node.id === nodeId);
+      
+      if (!nodeData) {
+        console.error('Node not found:', nodeId);
+        return;
+      }
+
+      const nodeTitle = nodeData.data.label as string;
+      const nodeDescription = nodeDescriptions[nodeId] || '';
+      const currentLevel = (nodeData.data.level as number) || 0;
+
+      console.log(`Expanding node: ${nodeTitle} (level ${currentLevel})`);
+
+      // Update node to show loading state
+      setNodes(prevNodes => prevNodes.map(node => 
+        node.id === nodeId 
+          ? { ...node, data: { ...node.data, isExpanding: true } }
+          : node
+      ));
+
+      // Call the backend API to expand the node
+      const response = await apiService.expandMindMapNode(
+        mindMapId,
+        nodeId,
+        nodeTitle,
+        nodeDescription,
+        currentLevel
+      );
+
+      if (response.success && response.expandedNodes) {
+        console.log(`Successfully expanded node ${nodeId} with ${response.expandedNodes.length} sub-nodes`);
+
+        // Calculate positions for the new sub-nodes
+        const parentPosition = nodeData.position;
+        const subNodesCount = response.expandedNodes.length;
+        const yStep = 80;
+        const startY = parentPosition.y - ((subNodesCount - 1) * yStep) / 2;
+
+        // Create new nodes for the expanded sub-nodes
+        const newNodes = response.expandedNodes.map((subNode: any, index: number) => ({
+          id: subNode.id,
+          type: 'customNode',
+          position: { 
+            x: parentPosition.x + 300, 
+            y: startY + index * yStep 
+          },
+          data: {
+            label: subNode.title,
+            expanded: false,
+            hasChildren: false,
+            canExpand: true, // Allow further expansion
+            isRoot: false,
+            isRead: false,
+            parentNode: nodeId,
+            level: subNode.level,
+            isSelected: false,
+            isExpanding: false,
+            onToggleReadStatus: handleToggleReadStatus,
+            onNodeClick: handleNodeClick,
+            onExpandNode: handleExpandNode
+          },
+          hidden: false,
+          draggable: true
+        }));
+
+        // Create new edges connecting the parent to the new sub-nodes
+        const newEdges = response.expandedNodes.map((subNode: any) => ({
+          id: `${nodeId}-${subNode.id}`,
+          source: nodeId,
+          target: subNode.id,
+          type: 'bezier',
+          animated: false,
+          style: { 
+            stroke: '#333', 
+            strokeWidth: 1,
+          },
+          markerEnd: undefined,
+          markerStart: undefined,
+          data: { curvature: 0.25 }
+        }));
+
+        // Add new nodes and edges to the graph
+        setNodes(prevNodes => [
+          ...prevNodes.map(node => 
+            node.id === nodeId 
+              ? { 
+                  ...node, 
+                  data: { 
+                    ...node.data, 
+                    isExpanding: false,
+                    hasChildren: true,
+                    expanded: true
+                  } 
+                }
+              : node
+          ),
+          ...newNodes
+        ]);
+
+        setEdges(prevEdges => [...prevEdges, ...newEdges]);
+
+        // Store the expanded nodes for this parent
+        setExpandedNodes(prev => ({
+          ...prev,
+          [nodeId]: response.expandedNodes
+        }));
+
+        // Center the view on the newly expanded area
+        setTimeout(() => {
+          if (newNodes.length > 0) {
+            const avgX = newNodes.reduce((sum: number, node: any) => sum + node.position.x, 0) / newNodes.length;
+            const avgY = newNodes.reduce((sum: number, node: any) => sum + node.position.y, 0) / newNodes.length;
+            setCenter(avgX, avgY, { zoom: getZoom(), duration: 800 });
+          }
+        }, 100);
+
+      } else {
+        console.error('Failed to expand node:', response.error || 'Unknown error');
+        // Update node to remove loading state
+        setNodes(prevNodes => prevNodes.map(node => 
+          node.id === nodeId 
+            ? { ...node, data: { ...node.data, isExpanding: false } }
+            : node
+        ));
+      }
+
+    } catch (error) {
+      console.error('Error expanding node:', error);
+      // Update node to remove loading state
+      setNodes(prevNodes => prevNodes.map(node => 
+        node.id === nodeId 
+          ? { ...node, data: { ...node.data, isExpanding: false } }
+          : node
+      ));
+    } finally {
+      // Remove from expanding nodes set
+      setExpandingNodes(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(nodeId);
+        return newSet;
+      });    }
+  }, [params?.id, expandingNodes, getNodes, nodeDescriptions, handleToggleReadStatus, handleNodeClick, setNodes, setEdges, setCenter, getZoom]);
+  // Effect to add expand handlers to nodes after handleExpandNode is defined
+  useEffect(() => {
+    setNodes(prevNodes => prevNodes.map(node => ({
+      ...node,
+      data: {
+        ...node.data,
+        onExpandNode: node.data.canExpand ? handleExpandNode : undefined
+      }
+    })));
+  }, [handleExpandNode, setNodes]);
+
+  // Effect to ensure expand handlers are attached when nodes are loaded from localStorage/API
+  useEffect(() => {
+    if (!isLoading && nodes.length > 0) {
+      setNodes(prevNodes => prevNodes.map(node => ({
+        ...node,
+        data: {
+          ...node.data,
+          onExpandNode: node.data.canExpand ? handleExpandNode : undefined
+        }
+      })));
+    }
+  }, [isLoading, nodes.length, handleExpandNode, setNodes]);
 
   // Handle edge connections
   const onConnect = useCallback(
@@ -1861,14 +2082,25 @@ More detailed content will be available soon with comprehensive explanations, eq
               "", // No syllabus available here
               parentNode ? [{ id: parentNode.id, label: (parentNode.data.label as string) || parentNode.id }] : [],
               childNodes
-            );
-
-            if (response?.success && response.description) {
+            );            if (response?.success && response.description) {
               console.log('Description received:', response.description.substring(0, 50) + '...');
               setNodeDescriptions(prev => ({
                 ...prev,
                 [selectedNode]: response.description,
               }));
+              
+              // Store multimedia content if available
+              if (response.multimedia) {
+                console.log('Multimedia content received:', {
+                  images: response.multimedia.images?.length || 0,
+                  videos: response.multimedia.videos?.length || 0,
+                  references: response.multimedia.references?.length || 0
+                });
+                setNodeMultimedia(prev => ({
+                  ...prev,
+                  [selectedNode]: response.multimedia,
+                }));
+              }
             } else {
               console.error('Failed to get node description:', response?.error || 'Unknown error');
             }
@@ -1886,11 +2118,12 @@ More detailed content will be available soon with comprehensive explanations, eq
 
     // Return the content and related topics
     return (
-      <>
-        {/* Main Content Card with formatted content */}
-        <div className="bg-neutral-800 border border-neutral-600 rounded-lg p-6">
-          <ContentFormatter content={String(nodeContent)} className="w-full" />
-        </div>
+      <>        {/* Main Content Card with multimedia content */}
+        <MultimediaContentDisplay 
+          content={String(nodeContent)}
+          multimedia={nodeMultimedia[selectedNode]}
+          className="w-full"
+        />
 
         {/* Read Status Toggle for Right Sidebar */}
         <div className="bg-neutral-800 border border-neutral-600 rounded-lg p-4">
