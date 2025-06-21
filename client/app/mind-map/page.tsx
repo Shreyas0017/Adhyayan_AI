@@ -26,7 +26,8 @@ import {
   IconFileText,
   IconSquareRoundedX,  IconChevronUp,
   IconChevronDown,
-  IconCoin
+  IconCoin,
+  IconList
 } from "@tabler/icons-react";
 
 // Extend Window interface for Speech Recognition
@@ -468,8 +469,7 @@ Use the quiz feature to test your understanding and the AI chat to ask specific 
   if (!isAuthenticated || !user) {
     router.push('/');
     return null;
-  }
-  const dockLinks = [
+  }  const dockLinks = [
     {
       title: "Home",
       icon: (
@@ -485,7 +485,7 @@ Use the quiz feature to test your understanding and the AI chat to ask specific 
       href: "/dashboard",
     },
     {
-      title: "Create Room",
+      title: "Quiz",
       icon: (
         <IconUsers className="h-full w-full text-neutral-500 dark:text-neutral-300" />
       ),
@@ -494,9 +494,16 @@ Use the quiz feature to test your understanding and the AI chat to ask specific 
     {
       title: "Mind Map",
       icon: (
-        <IconMap className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+        <IconMap className="h-full w-full text-red-400 dark:text-red-400" />
       ),
       href: "/mind-map",
+    },
+    {
+      title: "Flash Cards",
+      icon: (
+        <IconList className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/flashCard",
     },
     {
       title: "Settings",

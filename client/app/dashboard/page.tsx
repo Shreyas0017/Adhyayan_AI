@@ -42,6 +42,45 @@ export default function Dashboard() {
   const router = useRouter();
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [displayName, setDisplayName] = useState('');
+
+  // Update display name when user changes or when profile is updated
+  useEffect(() => {
+    const updateDisplayName = () => {
+      const savedProfile = localStorage.getItem('adhyayan-profile');
+      if (savedProfile) {
+        try {
+          const profile = JSON.parse(savedProfile);
+          setDisplayName(profile.displayName || user?.displayName || '');
+        } catch (error) {
+          setDisplayName(user?.displayName || '');
+        }
+      } else {
+        setDisplayName(user?.displayName || '');
+      }
+    };
+
+    updateDisplayName();
+
+    // Listen for profile updates
+    const handleProfileUpdate = () => {
+      updateDisplayName();
+    };
+
+    const handleSettingsUpdate = (event: CustomEvent) => {
+      if (event.detail?.profile?.displayName) {
+        setDisplayName(event.detail.profile.displayName);
+      }
+    };
+
+    window.addEventListener('userProfileUpdated', handleProfileUpdate);
+    window.addEventListener('settingsUpdated', handleSettingsUpdate as EventListener);
+
+    return () => {
+      window.removeEventListener('userProfileUpdated', handleProfileUpdate);
+      window.removeEventListener('settingsUpdated', handleSettingsUpdate as EventListener);
+    };
+  }, [user]);
 
   const handleSignOut = async () => {
     try {
@@ -54,7 +93,7 @@ export default function Dashboard() {
 
   // Generate a fallback avatar URL
   const getFallbackAvatar = () => {
-    const name = user?.displayName || user?.email || 'User';
+    const name = displayName || user?.displayName || user?.email || 'User';
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=374151&color=ffffff&size=80&font-size=0.33`;
   };
 
@@ -79,7 +118,6 @@ export default function Dashboard() {
     router.push('/');
     return null;
   }
-
   const dockLinks = [
     {
       title: "Home",
@@ -89,9 +127,16 @@ export default function Dashboard() {
       href: "/",
     },
     {
+      title: "Dashboard",
+      icon: (
+        <IconBrain className="h-full w-full text-red-400 dark:text-red-400" />
+      ),
+      href: "/dashboard",
+    },
+    {
       title: "Quiz",
       icon: (
-        <IconBrain className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+        <IconUsers className="h-full w-full text-neutral-500 dark:text-neutral-300" />
       ),
       href: "/create-room",
     },
@@ -107,7 +152,7 @@ export default function Dashboard() {
       icon: (
         <IconList className="h-full w-full text-neutral-500 dark:text-neutral-300" />
       ),
-      href: "flashCard",
+      href: "/flashCard",
     },
     {
       title: "Settings",
@@ -137,7 +182,7 @@ export default function Dashboard() {
               {/* Fallback/Loading avatar */}
               <div className="w-20 h-20 rounded-full border-4 border-neutral-700 bg-neutral-800 flex items-center justify-center">
                 <span className="text-white text-2xl font-bold">
-                  {(user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U').toUpperCase()}
+                  {(displayName?.charAt(0) || user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U').toUpperCase()}
                 </span>
               </div>
               
@@ -145,7 +190,7 @@ export default function Dashboard() {
               {user?.photoURL && !imageError && (
                 <img 
                   src={user.photoURL} 
-                  alt={user.displayName || user.email || 'User'} 
+                  alt={displayName || user.displayName || user.email || 'User'} 
                   className={`absolute inset-0 w-20 h-20 rounded-full border-4 border-neutral-700 object-cover transition-opacity duration-300 ${
                     imageLoaded ? 'opacity-100' : 'opacity-0'
                   }`}
@@ -158,27 +203,26 @@ export default function Dashboard() {
               {(!user?.photoURL || imageError) && (
                 <img 
                   src={getFallbackAvatar()} 
-                  alt={user?.displayName || user?.email || 'User'} 
+                  alt={displayName || user?.displayName || user?.email || 'User'} 
                   className="absolute inset-0 w-20 h-20 rounded-full border-4 border-neutral-700 object-cover"
                 />
               )}
             </div>
             <div className="flex flex-col items-start">
               <h1 className="text-4xl font-bold text-white mb-2">
-                Welcome back, {user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || 'User'}! 👋
+                Welcome back, {displayName?.split(' ')[0] || user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || 'User'}! 👋
               </h1>
               <p className="text-neutral-200 text-lg">
                 Ready to explore the future of AI-powered learning?
               </p>
             </div>
           </div>
-        </div>
-
-        {/* Floating Dock positioned like macOS taskbar */}
+        </div>        {/* Floating Dock positioned like macOS taskbar */}
         <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
           <FloatingDock
             mobileClassName="translate-y-20"
             items={dockLinks}
+            activeItem="/dashboard"
           />
         </div>
       </WavyBackground>
