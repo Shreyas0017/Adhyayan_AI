@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth-context';
 import { apiService } from '@/lib/api';
 import { FloatingDock } from "@/components/ui/floating-dock";
 import { MindMapSidebar } from "@/components/custom/MindMapSidebar";
+import { QuizModal } from "@/components/custom/QuizModal";
 import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-vanish-input";
 import { TextGenerateEffect } from "@/components/ui/text-generate-effect";
 import { MultimediaContentDisplay } from "@/components/custom/MultimediaContentDisplay";
@@ -304,6 +305,12 @@ function MindMapContent() {
   const [isResizing, setIsResizing] = useState(false);  // Track chat messages for AI interaction
   const [chatMessages, setChatMessages] = useState<Array<{id: string, type: 'user' | 'ai', content: string, timestamp: Date}>>([]);
   const [isAiTyping, setIsAiTyping] = useState(false);
+  
+  // Quiz modal state for mark-as-read functionality
+  const [showQuizModal, setShowQuizModal] = useState(false);
+  const [pendingReadNode, setPendingReadNode] = useState<string | null>(null);
+  const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
+  const [loadingQuiz, setLoadingQuiz] = useState(false);
     // Node descriptions and multimedia content state
   const [nodeDescriptions, setNodeDescriptions] = useState<Record<string, string>>({});
   const [nodeMultimedia, setNodeMultimedia] = useState<Record<string, any>>({});
@@ -351,8 +358,7 @@ function MindMapContent() {
       });
     });
       return initialStatus;
-  });
-  // Function to toggle read status of a node
+  });  // Function to toggle read status of a node
   const handleToggleReadStatus = useCallback(async (nodeId: string, isRead?: boolean): Promise<void> => {
     try {
       const mindMapId = params?.id as string;
@@ -364,7 +370,96 @@ function MindMapContent() {
       // Determine the new read status
       const newIsRead = isRead !== undefined ? isRead : !topicsReadStatus[nodeId];
       
-      console.log(`Toggling read status for ${nodeId}: ${newIsRead}`);
+      // If user is trying to mark as read (not unread), show quiz first
+      if (newIsRead && !topicsReadStatus[nodeId]) {
+        console.log(`Showing quiz for node ${nodeId} before marking as read`);
+        
+        // Check if we have a description for this node to generate quiz
+        const nodeDescription = nodeDescriptions[nodeId];
+        if (!nodeDescription) {
+          // If no description available, fetch it first
+          console.log(`No description available for ${nodeId}, fetching...`);
+          try {
+            const nodes = getNodes();
+            const nodeData = nodes.find(node => node.id === nodeId);
+            if (nodeData && nodeData.data && typeof nodeData.data === 'object' && 'label' in nodeData.data) {
+              const nodeLabel = String(nodeData.data.label);
+              const response = await apiService.getMindMapNodeDescription(
+                nodeId,
+                nodeLabel,
+                "",
+                [],
+                []
+              );
+              
+              if (response?.success && response.description) {
+                setNodeDescriptions(prev => ({
+                  ...prev,
+                  [nodeId]: response.description
+                }));
+                // Now proceed with quiz generation using the fetched description
+                await generateAndShowQuiz(nodeId, response.description);
+                return;
+              }
+            }
+          } catch (descError) {
+            console.error('Error fetching node description for quiz:', descError);
+          }
+          
+          // If we still don't have description, use a generic one
+          const fallbackDescription = `Educational content about ${nodeId}. This topic contains important concepts that you should understand before marking it as complete.`;
+          await generateAndShowQuiz(nodeId, fallbackDescription);
+        } else {
+          // We have the description, generate quiz
+          await generateAndShowQuiz(nodeId, nodeDescription);
+        }
+        return;
+      }
+      
+      // Direct marking (either marking as unread or already passed quiz)
+      await updateReadStatusDirectly(nodeId, newIsRead);
+      
+    } catch (error) {
+      console.error('Error in handleToggleReadStatus:', error);
+    }
+  }, [topicsReadStatus, params?.id, nodeDescriptions, getNodes]);
+
+  // Function to generate and show quiz
+  const generateAndShowQuiz = useCallback(async (nodeId: string, description: string) => {
+    try {
+      setLoadingQuiz(true);
+      setPendingReadNode(nodeId);
+      
+      console.log(`Generating quiz for node: ${nodeId}`);
+      const response = await apiService.getMindMapNodeQuiz(nodeId, description);
+      
+      if (response?.success && response.quiz && response.quiz.questions) {
+        setQuizQuestions(response.quiz.questions);
+        setShowQuizModal(true);
+      } else {
+        console.error('Failed to generate quiz:', response?.error);
+        // Fallback: mark as read without quiz
+        await updateReadStatusDirectly(nodeId, true);
+      }
+    } catch (error) {
+      console.error('Error generating quiz:', error);
+      // Fallback: mark as read without quiz
+      await updateReadStatusDirectly(nodeId, true);
+    } finally {
+      setLoadingQuiz(false);
+    }
+  }, []);
+
+  // Function to directly update read status (bypassing quiz)
+  const updateReadStatusDirectly = useCallback(async (nodeId: string, newIsRead: boolean) => {
+    try {
+      const mindMapId = params?.id as string;
+      if (!mindMapId) {
+        console.error('Mind map ID not available');
+        return;
+      }
+      
+      console.log(`Updating read status for ${nodeId}: ${newIsRead}`);
       
       // Update local state immediately for better UX
       const updatedStatus = {
@@ -373,8 +468,7 @@ function MindMapContent() {
       };
       
       setTopicsReadStatus(updatedStatus);
-      
-      // Update local mind map data and check for auto-parent marking
+        // Update local mind map data and check for auto-parent marking
       setLocalMindMapData(prev => {
         const updatedData = prev.map(topic => {
           if (topic.id === nodeId) {
@@ -410,7 +504,7 @@ function MindMapContent() {
               // Also update in backend
               setTimeout(() => {
                 apiService.updateNodeReadStatus(mindMapId, topic.id, true)
-                  .catch(error => console.error('Error auto-updating parent read status:', error));
+                  .catch((error: any) => console.error('Error auto-updating parent read status:', error));
               }, 100);
               
               return {
@@ -425,15 +519,6 @@ function MindMapContent() {
         
         return updatedData;
       });
-
-      // Update node colors in the mind map visualization
-      setNodes(nodes => nodes.map(node => ({
-        ...node,
-        data: {
-          ...node.data,
-          isRead: updatedStatus[node.id] || false
-        }
-      })));
 
       // Persist to backend
       try {
@@ -465,8 +550,24 @@ function MindMapContent() {
         }));
       }
     } catch (error) {
-      console.error('Error in handleToggleReadStatus:', error);
-    }}, [topicsReadStatus, params?.id, setLocalMindMapData]);
+      console.error('Error in updateReadStatusDirectly:', error);
+    }
+  }, [topicsReadStatus, params?.id, setLocalMindMapData]);
+
+  // Handle quiz completion
+  const handleQuizSuccess = useCallback(async () => {
+    if (pendingReadNode) {
+      await updateReadStatusDirectly(pendingReadNode, true);
+      setPendingReadNode(null);
+      setQuizQuestions([]);
+      setShowQuizModal(false);
+    }
+  }, [pendingReadNode, updateReadStatusDirectly]);  // Handle quiz modal close
+  const handleQuizClose = useCallback(() => {
+    setPendingReadNode(null);
+    setQuizQuestions([]);
+    setShowQuizModal(false);
+  }, []);
 
   // Function to load read status from backend
   const loadReadStatus = useCallback(async () => {
@@ -1794,13 +1895,12 @@ More detailed content will be available soon with comprehensive explanations, eq
       }, eds));
     },
     [setEdges]
-  );
-    // Sync the expanded topics and selected node between sidebar and mind map visualization
+  );  // Sync the expanded topics and selected node between sidebar and mind map visualization
   useEffect(() => {
     // Update node expansion state and selection based on expandedTopics and selectedNode
     setNodes(nds => nds.map(node => {
       let updatedNode = { ...node };
-        // Update selection state
+      // Update selection state
       updatedNode.data = { 
         ...updatedNode.data, 
         isSelected: selectedNode === node.id,
@@ -1811,7 +1911,7 @@ More detailed content will be available soon with comprehensive explanations, eq
       if (expandedTopics.includes(node.id)) {
         updatedNode.data = { ...updatedNode.data, expanded: true };
       }
-        // Show/hide nodes based on parent expansion
+      // Show/hide nodes based on parent expansion
       const nodeData = node.data as CustomNodeData;
       if (nodeData.parentNode && expandedTopics.includes(nodeData.parentNode)) {
         updatedNode.hidden = false;
@@ -2226,15 +2326,22 @@ More detailed content will be available soon with comprehensive explanations, eq
           </div>
         </div>
       )}
-      
-      {/* Floating Dock */}
+        {/* Floating Dock */}
       <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
         <FloatingDock
           mobileClassName="translate-y-20"
           items={dockLinks}
-          activeItem="/mind-map"
+          activeItem="/mind-map"        />
+      </div>      {/* Quiz Modal */}
+      {showQuizModal && quizQuestions.length > 0 && (
+        <QuizModal
+          isOpen={showQuizModal}
+          onClose={handleQuizClose}
+          questions={quizQuestions}
+          onSuccess={handleQuizSuccess}
+          nodeTitle={pendingReadNode || 'Topic'}
         />
-      </div>
+      )}
     </div>
   );
 }
