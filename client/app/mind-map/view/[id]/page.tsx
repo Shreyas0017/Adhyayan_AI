@@ -63,37 +63,168 @@ type CustomNodeData = {
   onExpandNode?: (nodeId: string) => void;
 }
 
+// Utility function to calculate dynamic node positions to prevent overlaps
+const calculateDynamicPositions = (nodes: Node[], changedNodeId: string, isExpanding: boolean) => {
+  const NODE_HEIGHT = 60; // Approximate height of a node including margins
+  const VERTICAL_SPACING = 20; // Extra spacing between nodes
+  const CHILD_HORIZONTAL_OFFSET = 300; // Horizontal spacing for child nodes
+  const MIN_SPACING_BETWEEN_GROUPS = 40; // Minimum space between different node groups
+  
+  // Create a copy of nodes array to modify
+  const repositionedNodes = [...nodes];
+  
+  // Find the node that was expanded/collapsed
+  const changedNode = repositionedNodes.find(n => n.id === changedNodeId);
+  if (!changedNode) return repositionedNodes;
+  
+  // Get all visible child nodes of the expanded/collapsed node
+  const childNodes = repositionedNodes.filter(n => 
+    n.data.parentNode === changedNodeId && !n.hidden
+  );
+  
+  // Calculate the space needed for child nodes
+  const childrenSpaceNeeded = isExpanding 
+    ? (childNodes.length * NODE_HEIGHT) + ((childNodes.length - 1) * VERTICAL_SPACING)
+    : 0;
+  
+  // Get the parent node ID to find siblings correctly
+  const parentNodeId = changedNode.data.parentNode;
+  
+  // Get all sibling nodes (nodes with the same parent as changedNode)
+  const siblingNodes = repositionedNodes.filter(n => 
+    n.data.parentNode === parentNodeId && n.id !== changedNodeId && !n.hidden
+  );
+  
+  // Sort siblings by their current Y position
+  siblingNodes.sort((a, b) => a.position.y - b.position.y);
+  
+  // Find siblings above and below the changed node
+  const nodesAbove = siblingNodes.filter(n => n.position.y < changedNode.position.y);
+  const nodesBelow = siblingNodes.filter(n => n.position.y > changedNode.position.y);
+  
+  // Calculate how much space we need to make for the children
+  const halfDisplacement = isExpanding ? (childrenSpaceNeeded / 2) + MIN_SPACING_BETWEEN_GROUPS : 0;
+  
+  // Move sibling nodes above upward
+  nodesAbove.forEach(node => {
+    const nodeIndex = repositionedNodes.findIndex(n => n.id === node.id);
+    if (nodeIndex >= 0) {
+      repositionedNodes[nodeIndex] = {
+        ...repositionedNodes[nodeIndex],
+        position: {
+          ...repositionedNodes[nodeIndex].position,
+          y: repositionedNodes[nodeIndex].position.y - halfDisplacement
+        }
+      };
+      
+      // Also move any children of the displaced node
+      moveNodeAndChildren(repositionedNodes, node.id, 0, -halfDisplacement);
+    }
+  });
+  
+  // Move sibling nodes below downward
+  nodesBelow.forEach(node => {
+    const nodeIndex = repositionedNodes.findIndex(n => n.id === node.id);
+    if (nodeIndex >= 0) {
+      repositionedNodes[nodeIndex] = {
+        ...repositionedNodes[nodeIndex],
+        position: {
+          ...repositionedNodes[nodeIndex].position,
+          y: repositionedNodes[nodeIndex].position.y + halfDisplacement
+        }
+      };
+      
+      // Also move any children of the displaced node
+      moveNodeAndChildren(repositionedNodes, node.id, 0, halfDisplacement);
+    }
+  });
+  
+  // Position child nodes if expanding
+  if (isExpanding && childNodes.length > 0) {
+    const startY = changedNode.position.y - (childrenSpaceNeeded / 2);
+    
+    childNodes.forEach((childNode, index) => {
+      const childIndex = repositionedNodes.findIndex(n => n.id === childNode.id);
+      if (childIndex >= 0) {
+        repositionedNodes[childIndex] = {
+          ...repositionedNodes[childIndex],
+          position: {
+            x: changedNode.position.x + CHILD_HORIZONTAL_OFFSET,
+            y: startY + (index * (NODE_HEIGHT + VERTICAL_SPACING))
+          }
+        };
+      }
+    });
+  }
+  
+  return repositionedNodes;
+};
+
+// Helper function to recursively move a node and all its children
+const moveNodeAndChildren = (nodes: Node[], nodeId: string, deltaX: number, deltaY: number) => {
+  // Find children of the node
+  const childNodes = nodes.filter(n => n.data.parentNode === nodeId && !n.hidden);
+  
+  // Move each child and their children recursively
+  childNodes.forEach(child => {
+    const childIndex = nodes.findIndex(n => n.id === child.id);
+    if (childIndex >= 0) {
+      nodes[childIndex] = {
+        ...nodes[childIndex],
+        position: {
+          x: nodes[childIndex].position.x + deltaX,
+          y: nodes[childIndex].position.y + deltaY
+        }
+      };
+      
+      // Recursively move this child's children
+      moveNodeAndChildren(nodes, child.id, deltaX, deltaY);
+    }
+  });
+};
+
 // Custom node component for expandable/collapsible behavior
 const CustomNode = ({ data, id }: NodeProps) => {
   const { setNodes, getNodes, setCenter, getZoom } = useReactFlow();
   const nodeData = data as CustomNodeData;
-  
-  // Function to handle expand/collapse
+    // Function to handle expand/collapse with dynamic repositioning
   const toggleExpanded = useCallback(() => {
     const targetNodeId = id;
     
     setNodes((nds) => {
-      return nds.map((node) => {
+      const targetNode = nds.find(n => n.id === targetNodeId);
+      if (!targetNode) return nds;
+      
+      const wasExpanded = targetNode.data.expanded;
+      const willExpand = !wasExpanded;
+      
+      // First, toggle the expanded state and show/hide child nodes
+      const updatedNodes = nds.map((node) => {
         // Toggle the expanded state of clicked node
         if (node.id === targetNodeId) {
           return {
             ...node,
-            data: { ...node.data, expanded: !node.data.expanded }
+            data: { ...node.data, expanded: willExpand }
           };
         }
         
         // Show/hide child nodes based on parent's expanded state
         if (node.data.parentNode === targetNodeId) {
-          const parentNode = nds.find(n => n.id === targetNodeId);
-          const newHidden = parentNode ? !parentNode.data.expanded : true;
           return {
             ...node,
-            hidden: newHidden,
+            hidden: !willExpand,
           };
         }
         return node;
       });
-    });    // Center view on the expanded area after a slight delay to allow for node updates
+      
+      // Calculate space requirements and reposition nodes dynamically
+      const repositionedNodes = calculateDynamicPositions(updatedNodes, targetNodeId, willExpand);
+      
+      return repositionedNodes;
+    });
+
+    // Center view on the expanded area after a slight delay to allow for node updates
     setTimeout(() => {
       const updatedNodes = getNodes();
       const expandedNode = updatedNodes.find(n => n.id === targetNodeId);
@@ -185,17 +316,20 @@ const CustomNode = ({ data, id }: NodeProps) => {
             <IconPlus className="h-3 w-3 text-white" />
           )}
         </div>
-      )}
-
-      {/* Main node container */}
+      )}      {/* Main node container */}
       <div 
         className={cn(
           "px-4 py-2 min-w-32 rounded-md flex items-center justify-center border cursor-pointer",
+          "transition-all duration-500 ease-in-out", // Add smooth animation for all transitions
           getBorderColor(),
           getBackgroundColor(),
           nodeData.isRoot ? "font-semibold" : "font-normal"
         )}
         onClick={handleNodeClick}
+        style={{
+          // Add CSS transform for smooth position transitions
+          transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
       >
         {/* Read status indicator/toggle button for non-root nodes - more subtle design */}
         {!nodeData.isRoot && (
@@ -1743,21 +1877,17 @@ More detailed content will be available soon with comprehensive explanations, eq
       );
 
       if (response.success && response.expandedNodes) {
-        console.log(`Successfully expanded node ${nodeId} with ${response.expandedNodes.length} sub-nodes`);
-
-        // Calculate positions for the new sub-nodes
+        console.log(`Successfully expanded node ${nodeId} with ${response.expandedNodes.length} sub-nodes`);        // Calculate positions for the new sub-nodes using dynamic positioning
         const parentPosition = nodeData.position;
-        const subNodesCount = response.expandedNodes.length;
-        const yStep = 80;
-        const startY = parentPosition.y - ((subNodesCount - 1) * yStep) / 2;
-
-        // Create new nodes for the expanded sub-nodes
+        const parentNodeId = nodeData.id;
+        
+        // Create new nodes for the expanded sub-nodes with temporary positions
         const newNodes = response.expandedNodes.map((subNode: any, index: number) => ({
           id: subNode.id,
           type: 'customNode',
           position: { 
             x: parentPosition.x + 300, 
-            y: startY + index * yStep 
+            y: parentPosition.y + (index * 80) // Temporary positioning
           },
           data: {
             label: subNode.title,
@@ -1794,23 +1924,28 @@ More detailed content will be available soon with comprehensive explanations, eq
           data: { curvature: 0.25 }
         }));
 
-        // Add new nodes and edges to the graph
-        setNodes(prevNodes => [
-          ...prevNodes.map(node => 
-            node.id === nodeId 
-              ? { 
-                  ...node, 
-                  data: { 
-                    ...node.data, 
-                    isExpanding: false,
-                    hasChildren: true,
-                    expanded: true
-                  } 
-                }
-              : node
-          ),
-          ...newNodes
-        ]);
+        // Add new nodes and edges to the graph with dynamic positioning
+        setNodes(prevNodes => {
+          const updatedNodes = [
+            ...prevNodes.map(node => 
+              node.id === nodeId 
+                ? { 
+                    ...node, 
+                    data: { 
+                      ...node.data, 
+                      isExpanding: false,
+                      hasChildren: true,
+                      expanded: true
+                    } 
+                  }
+                : node
+            ),
+            ...newNodes
+          ];
+          
+          // Apply dynamic positioning to prevent overlaps
+          return calculateDynamicPositions(updatedNodes, nodeId, true);
+        });
 
         setEdges(prevEdges => [...prevEdges, ...newEdges]);
 
@@ -2006,8 +2141,7 @@ More detailed content will be available soon with comprehensive explanations, eq
           <div className="p-6 border-b border-neutral-700">
             <h1 className="text-2xl font-bold text-white">{mindMapTitle}</h1>
             <p className="text-neutral-400 mt-1">Interactive learning visualization</p>
-          </div>
-            {/* ReactFlow component */}
+          </div>          {/* ReactFlow component */}
           <div className="flex-1" ref={reactFlowWrapper}>
             <ReactFlow 
               nodes={nodes} 
@@ -2020,7 +2154,19 @@ More detailed content will be available soon with comprehensive explanations, eq
               className="bg-black"
               nodesDraggable={true}
               zoomOnScroll={true}
-              panOnScroll={true}              defaultEdgeOptions={{
+              panOnScroll={true}
+              // Enable smooth animations
+              connectionLineStyle={{ stroke: '#333', strokeWidth: 2 }}
+              defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+              minZoom={0.2}
+              maxZoom={2}
+              snapToGrid={true}
+              snapGrid={[15, 15]}
+              // Add animation duration for smoother transitions
+              deleteKeyCode="Delete"
+              selectionKeyCode="Shift"
+              multiSelectionKeyCode="Meta"
+              defaultEdgeOptions={{
                 type: 'bezier',
                 animated: false,
                 style: { strokeWidth: 1, stroke: '#333' },

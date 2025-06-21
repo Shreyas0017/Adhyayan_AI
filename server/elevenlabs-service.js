@@ -1,20 +1,20 @@
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-const { promisify } = require('util');
+const axios = require("axios");
+const fs = require("fs");
+const path = require("path");
+const { promisify } = require("util");
 const writeFileAsync = promisify(fs.writeFile);
 const mkdirAsync = promisify(fs.mkdir);
 const existsAsync = promisify(fs.exists);
-require('dotenv').config();
+require("dotenv").config();
 
 class ElevenLabsService {
   constructor(apiKey, geminiApiKey) {
     this.apiKey = apiKey;
     this.geminiApiKey = geminiApiKey;
-    this.baseUrl = 'https://api.elevenlabs.io/v1';
-    this.defaultVoiceId = 'ErXwobaYiN019PkySvjV'; // Antoni - default male voice
-    this.femaleVoiceId = 'EXAVITQu4vr4xnSDxMaL'; // Bella - female voice
-    this.podcastDir = path.join(__dirname, 'public', 'podcasts');
+    this.baseUrl = "https://api.elevenlabs.io/v1";
+    this.defaultVoiceId = "bIHbv24MWmeRgasZH58o"; // Will - available male voice
+    this.femaleVoiceId = "EXAVITQu4vr4xnSDxMaL"; // Sarah - available female voice
+    this.podcastDir = path.join(__dirname, "public", "podcasts");
   }
 
   // Initialize the podcast directory
@@ -26,7 +26,7 @@ class ElevenLabsService {
       }
       return true;
     } catch (error) {
-      console.error('Error initializing ElevenLabs service:', error);
+      console.error("Error initializing ElevenLabs service:", error);
       return false;
     }
   }
@@ -35,19 +35,19 @@ class ElevenLabsService {
   async getVoices() {
     try {
       const response = await axios.get(`${this.baseUrl}/voices`, {
-        headers: { 'xi-api-key': this.apiKey }
+        headers: { "xi-api-key": this.apiKey },
       });
       return response.data.voices;
     } catch (error) {
-      console.error('Error fetching ElevenLabs voices:', error);
-      throw new Error('Failed to fetch voices from ElevenLabs API');
+      console.error("Error fetching ElevenLabs voices:", error);
+      throw new Error("Failed to fetch voices from ElevenLabs API");
     }
   }
   // Generate podcast script from topic content using Gemini API
   async generatePodcastScript(topic, content) {
     try {
       console.log(`Generating podcast script for topic: ${topic}`);
-        const promptTemplate = `
+      const promptTemplate = `
       Create a comprehensive educational podcast script (8-12 minutes when read aloud) about "${topic}".
       
       Context and reference material:
@@ -97,38 +97,46 @@ class ElevenLabsService {
             {
               parts: [
                 {
-                  text: promptTemplate
-                }
-              ]
-            }
-          ]
+                  text: promptTemplate,
+                },
+              ],
+            },
+          ],
         },
         {
           headers: {
-            'Content-Type': 'application/json'
-          }
+            "Content-Type": "application/json",
+          },
         }
       );
 
       // Extract the generated content from Gemini response
-      if (response.data && response.data.candidates && response.data.candidates[0] && 
-          response.data.candidates[0].content && response.data.candidates[0].content.parts) {
+      if (
+        response.data &&
+        response.data.candidates &&
+        response.data.candidates[0] &&
+        response.data.candidates[0].content &&
+        response.data.candidates[0].content.parts
+      ) {
         const script = response.data.candidates[0].content.parts[0].text;
-        console.log('Generated script preview:', script.substring(0, 100) + '...');
+        console.log(
+          "Generated script preview:",
+          script.substring(0, 100) + "..."
+        );
         return script;
       } else {
-        console.error('Unexpected Gemini API response format:', response.data);
+        console.error("Unexpected Gemini API response format:", response.data);
         // Fall back to demo script if Gemini fails
         return this.getDemoScript();
       }
     } catch (error) {
-      console.error('Error generating podcast script with Gemini:', error);
+      console.error("Error generating podcast script with Gemini:", error);
       if (error.response) {
-        console.error('Gemini API error details:', error.response.data);
+        console.error("Gemini API error details:", error.response.data);
       }
-      
+
       // Fall back to the demo script
-      console.log('Falling back to demo script');
+      console.log("Falling back to demo script");
       return this.getDemoScript();
     }
   }
@@ -136,168 +144,241 @@ class ElevenLabsService {
   // Convert script to audio using ElevenLabs API
   async convertScriptToAudio(script, topicId) {
     if (!script) {
-      throw new Error('No script provided for conversion');
+      throw new Error("No script provided for conversion");
     }
 
     try {
       // Process script to separate voices
-      const lines = script.split('\n').filter(line => line.trim().length > 0);
-        // Process each line by speaker
+      const lines = script.split("\n").filter((line) => line.trim().length > 0);
+      // Process each line by speaker
       const SankkLines = [];
       const priyaLines = [];
-      
+
       for (const line of lines) {
-        if (line.startsWith('Sankk:')) {
+        if (line.startsWith("Sankk:")) {
           SankkLines.push(line.substring(6).trim());
-        } else if (line.startsWith('Priya:')) {
+        } else if (line.startsWith("Priya:")) {
           priyaLines.push(line.substring(6).trim());
         }
       }
-        console.log(`Found ${SankkLines.length} lines for Sankk and ${priyaLines.length} lines for Priya`);
-      
+      console.log(
+        `Found ${SankkLines.length} lines for Sankk and ${priyaLines.length} lines for Priya`
+      );
+
       // Use more lines to create a longer, more complete podcast
       // We'll use up to 30 lines for Sankk and 30 lines for Priya to create a substantial podcast
-      const SankkContent = SankkLines.slice(0, 30).join(' '); // Up to 30 lines
-      const priyaContent = priyaLines.slice(0, 30).join(' '); // Up to 30 lines
+      const SankkContent = SankkLines.slice(0, 30).join(" "); // Up to 30 lines
+      const priyaContent = priyaLines.slice(0, 30).join(" "); // Up to 30 lines
 
       console.log(`Processing script for Sankk: ${SankkContent.length} chars`);
       console.log(`Processing script for Priya: ${priyaContent.length} chars`);
-      
       // Generate audio for both speakers
-      console.log('Generating audio for both speakers...');
-      
+      console.log("Generating audio for both speakers...");
+
       // Generate them sequentially to avoid overwhelming the API
-      console.log('Generating audio for Sankk...');
-      const SankkAudioBuffer = await this.generateSpeech(SankkContent, this.defaultVoiceId);
-      
-      console.log('Generating audio for Priya...');
-      const priyaAudioBuffer = await this.generateSpeech(priyaContent, this.femaleVoiceId);
-      
-      console.log('Successfully generated audio for both speakers');
-      
+      console.log("Generating audio for Sankk...");
+      const SankkAudioBuffer = await this.generateSpeech(
+        SankkContent,
+        this.defaultVoiceId
+      );
+
+      console.log("Generating audio for Priya...");
+      const priyaAudioBuffer = await this.generateSpeech(
+        priyaContent,
+        this.femaleVoiceId
+      );
+
+      console.log("Successfully generated audio for both speakers");
+
       // For now, we'll concatenate the buffers simply (in production, proper audio merging would be needed)
       // We'll use Sankk's audio as the primary and append Priya's
-      const combinedBuffer = Buffer.concat([SankkAudioBuffer, priyaAudioBuffer]);
-      
+      const combinedBuffer = Buffer.concat([
+        SankkAudioBuffer,
+        priyaAudioBuffer,
+      ]);
+
       // Convert combined audio buffer to Base64
-      const audioBase64 = combinedBuffer.toString('base64');
-      
+      const audioBase64 = combinedBuffer.toString("base64");
+
       // Create a data URL that can be used directly in an audio element
       const audioDataUrl = `data:audio/mp3;base64,${audioBase64}`;
-      
+
       return {
         audioUrl: audioDataUrl,
-        script: script
+        script: script,
       };
     } catch (error) {
-      console.error('Error converting script to audio:', error);
-      throw new Error('Failed to convert script to audio');
+      console.error("Error converting script to audio:", error);
+      throw new Error("Failed to convert script to audio");
     }
   }
-  // Generate speech using ElevenLabs API with retry mechanism
+  // Generate speech using OpenAI TTS as fallback when ElevenLabs fails
+  async generateSpeechWithOpenAI(text, voice = "alloy") {
+    try {
+      console.log("Using OpenAI TTS as fallback...");
+
+      const response = await axios({
+        method: "post",
+        url: "https://api.openai.com/v1/audio/speech",
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        data: {
+          model: "tts-1",
+          input: text.substring(0, 4000), // OpenAI TTS limit
+          voice: voice, // alloy, echo, fable, onyx, nova, shimmer
+          response_format: "mp3",
+        },
+        responseType: "arraybuffer",
+      });
+
+      console.log("OpenAI TTS successful");
+      return response.data;
+    } catch (error) {
+      console.error("OpenAI TTS error:", error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  // Generate speech using ElevenLabs API with retry mechanism and OpenAI fallback
   async generateSpeech(text, voiceId = this.defaultVoiceId) {
     try {
       // If text is too long, we'll split it to avoid timeouts
       const maxChunkLength = 1000; // Characters per request
       const textChunks = [];
-      
+
       if (text.length > maxChunkLength) {
-      console.log(`Text is ${text.length} chars long, splitting into chunks...`);
-      // Split text into chunks at sentence boundaries
-      let remainingText = text;
-      while (remainingText.length > 0) {
-        let chunkSize = Math.min(maxChunkLength, remainingText.length);
-        
-        // Try to find a sentence end within the last 200 chars of the chunk
-        if (chunkSize === maxChunkLength) {
-          const lastPeriodPos = remainingText.substring(0, chunkSize).lastIndexOf('.');
-          const lastExclamationPos = remainingText.substring(0, chunkSize).lastIndexOf('!');
-          const lastQuestionPos = remainingText.substring(0, chunkSize).lastIndexOf('?');
-          
-          // Find the latest sentence end
-          const sentenceEndPos = Math.max(
-            lastPeriodPos > chunkSize - 200 ? lastPeriodPos : -1,
-            lastExclamationPos > chunkSize - 200 ? lastExclamationPos : -1,
-            lastQuestionPos > chunkSize - 200 ? lastQuestionPos : -1
-          );
-          
-          // If we found a sentence end, use it as the chunk boundary
-          if (sentenceEndPos !== -1) {
-            chunkSize = sentenceEndPos + 1;
+        console.log(
+          `Text is ${text.length} chars long, splitting into chunks...`
+        );
+        // Split text into chunks at sentence boundaries
+        let remainingText = text;
+        while (remainingText.length > 0) {
+          let chunkSize = Math.min(maxChunkLength, remainingText.length);
+
+          // Try to find a sentence end within the last 200 chars of the chunk
+          if (chunkSize === maxChunkLength) {
+            const lastPeriodPos = remainingText
+              .substring(0, chunkSize)
+              .lastIndexOf(".");
+            const lastExclamationPos = remainingText
+              .substring(0, chunkSize)
+              .lastIndexOf("!");
+            const lastQuestionPos = remainingText
+              .substring(0, chunkSize)
+              .lastIndexOf("?");
+
+            // Find the latest sentence end
+            const sentenceEndPos = Math.max(
+              lastPeriodPos > chunkSize - 200 ? lastPeriodPos : -1,
+              lastExclamationPos > chunkSize - 200 ? lastExclamationPos : -1,
+              lastQuestionPos > chunkSize - 200 ? lastQuestionPos : -1
+            );
+
+            // If we found a sentence end, use it as the chunk boundary
+            if (sentenceEndPos !== -1) {
+              chunkSize = sentenceEndPos + 1;
+            }
+          }
+
+          textChunks.push(remainingText.substring(0, chunkSize));
+          remainingText = remainingText.substring(chunkSize);
+        }
+
+        console.log(`Split into ${textChunks.length} chunks`);
+      } else {
+        textChunks.push(text);
+      }
+
+      // Process each chunk with retries
+      const allAudioBuffers = [];
+
+      for (let i = 0; i < textChunks.length; i++) {
+        const chunk = textChunks[i];
+        console.log(
+          `Processing chunk ${i + 1}/${textChunks.length}, length: ${
+            chunk.length
+          } chars`
+        );
+
+        let retries = 0;
+        const maxRetries = 3;
+
+        while (retries < maxRetries) {
+          try {
+            const response = await axios({
+              method: "post",
+              url: `${this.baseUrl}/text-to-speech/${voiceId}`,
+              headers: {
+                "xi-api-key": this.apiKey,
+                "Content-Type": "application/json",
+                Accept: "audio/mpeg",
+              },
+              data: {
+                text: chunk,
+                model_id: "eleven_monolingual_v1", // Using a faster model
+                voice_settings: {
+                  stability: 0.75,
+                  similarity_boost: 0.75,
+                },
+              },
+              responseType: "arraybuffer",
+              timeout: 60000, // 60 second timeout
+            });
+
+            allAudioBuffers.push(response.data);
+            console.log(`Successfully processed chunk ${i + 1}`);
+            break; // Success, exit retry loop
+          } catch (error) {
+            retries++;
+            console.error(
+              `Error generating speech (attempt ${retries}/${maxRetries}):`,
+              error.message
+            );
+
+            if (retries >= maxRetries) {
+              throw new Error(
+                `Failed to generate speech after ${maxRetries} attempts: ${error.message}`
+              );
+            }
+
+            // Wait before retry (exponential backoff)
+            const delay = 2000 * Math.pow(2, retries - 1); // 2s, 4s, 8s...
+            console.log(`Retrying in ${delay / 1000} seconds...`);
+            await new Promise((resolve) => setTimeout(resolve, delay));
           }
         }
-        
-        textChunks.push(remainingText.substring(0, chunkSize));
-        remainingText = remainingText.substring(chunkSize);
       }
-      
-      console.log(`Split into ${textChunks.length} chunks`);
-    } else {
-      textChunks.push(text);
-    }
-    
-    // Process each chunk with retries
-    const allAudioBuffers = [];
-    
-    for (let i = 0; i < textChunks.length; i++) {
-      const chunk = textChunks[i];
-      console.log(`Processing chunk ${i+1}/${textChunks.length}, length: ${chunk.length} chars`);
-      
-      let retries = 0;
-      const maxRetries = 3;
-      
-      while (retries < maxRetries) {
-        try {
-          const response = await axios({
-            method: 'post',
-            url: `${this.baseUrl}/text-to-speech/${voiceId}`,
-            headers: {
-              'xi-api-key': this.apiKey,
-              'Content-Type': 'application/json',
-              'Accept': 'audio/mpeg'
-            },
-            data: {
-              text: chunk,
-              model_id: 'eleven_monolingual_v1', // Using a faster model
-              voice_settings: {
-                stability: 0.75,
-                similarity_boost: 0.75
-              }
-            },
-            responseType: 'arraybuffer',
-            timeout: 60000 // 60 second timeout
-          });
-          
-          allAudioBuffers.push(response.data);
-          console.log(`Successfully processed chunk ${i+1}`);
-          break; // Success, exit retry loop
-        } catch (error) {
-          retries++;
-          console.error(`Error generating speech (attempt ${retries}/${maxRetries}):`, error.message);
-          
-          if (retries >= maxRetries) {
-            throw new Error(`Failed to generate speech after ${maxRetries} attempts: ${error.message}`);
-          }
-          
-          // Wait before retry (exponential backoff)
-          const delay = 2000 * Math.pow(2, retries - 1); // 2s, 4s, 8s...
-          console.log(`Retrying in ${delay/1000} seconds...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-    }
       // If we only have one buffer, return it
-    if (allAudioBuffers.length === 1) {
+      if (allAudioBuffers.length === 1) {
+        return allAudioBuffers[0];
+      }
+
+      // Otherwise, concatenate all buffers (for now, we'll just return the first chunk)
+      // In a production environment, you'd want to properly concatenate the MP3 files
+      console.log(
+        `Returning first audio chunk of ${allAudioBuffers.length} total chunks`
+      );
       return allAudioBuffers[0];
-    }
-    
-    // Otherwise, concatenate all buffers (for now, we'll just return the first chunk)
-    // In a production environment, you'd want to properly concatenate the MP3 files
-    console.log(`Returning first audio chunk of ${allAudioBuffers.length} total chunks`);
-    return allAudioBuffers[0];
     } catch (error) {
-      console.error('Error generating speech with ElevenLabs:', error);
-      throw new Error('Failed to generate speech with ElevenLabs API');
+      console.error("Error generating speech with ElevenLabs:", error);
+
+      // If ElevenLabs fails (like free tier disabled), try OpenAI TTS
+      console.log("ElevenLabs failed, attempting OpenAI TTS fallback...");
+      try {
+        // Choose voice based on voiceId
+        const openaiVoice = voiceId === this.femaleVoiceId ? "nova" : "alloy";
+        const fallbackAudio = await this.generateSpeechWithOpenAI(
+          text,
+          openaiVoice
+        );
+        console.log("Successfully generated speech using OpenAI TTS fallback");
+        return fallbackAudio;
+      } catch (fallbackError) {
+        console.error("OpenAI TTS fallback also failed:", fallbackError);
+        throw new Error("Both ElevenLabs and OpenAI TTS failed");
+      }
     }
   }
 

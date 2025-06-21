@@ -126,7 +126,7 @@ const QuestionOption = React.memo(({
       if (index === correctAnswer) {
         className += "border-green-500 bg-green-500/20 text-green-400";
       } else if (index === selectedAnswer && selectedAnswer !== correctAnswer) {
-        className += "border-red-500 bg-red-500/20 text-red-400";
+        className += "border-grey-500 bg-grey-500/20 text-grey-400";
       } else {
         className += "border-white/10 bg-white/5 text-neutral-400";
       }
@@ -155,7 +155,7 @@ const QuestionOption = React.memo(({
           <IconCheck className="h-5 w-5 text-green-400" />
         )}
         {answered && showExplanation && index === selectedAnswer && selectedAnswer !== correctAnswer && (
-          <IconX className="h-5 w-5 text-red-400" />
+          <IconLoader2 className="h-5 w-5 text-neutral-400" />
         )}
       </div>
     </button>
