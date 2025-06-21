@@ -16,6 +16,9 @@ const fetch = require("node-fetch"); // For keep-alive pings
 const { fixBrokenJSON } = require("./fix_json"); // Import the JSON fixing utility
 const { transformGroqResponse } = require("./transform"); // Import the transform utility
 const ElevenLabsService = require("./elevenlabs-service"); // Import the ElevenLabs service
+const { tavily } = require("@tavily/core");
+const { getJson } = require("serpapi");
+const { google } = require('googleapis');
 require("dotenv").config();
 
 // Ensure JWT_SECRET exists or use a fallback for development
@@ -83,6 +86,63 @@ const elevenLabsService = new ElevenLabsService(
   process.env.ELEVENLABS_API_KEY,
   process.env.GEMINI_API_KEY
 );
+
+// Initialize Tavily Search API
+const tavilyClient = tavily({ apiKey: process.env.TAVILY_API_KEY });
+
+// Initialize YouTube API
+const youtube = google.youtube('v3');
+
+// Helper function to search for images using SerpAPI
+const searchImages = async (query) => {
+  try {
+    const response = await getJson({
+      engine: "google_images",
+      q: `${query} tutorial diagram explanation educational`,
+      api_key: process.env.SERPAPI_API_KEY,
+      num: 5
+    });
+    
+    return response.images_results?.slice(0, 5).map(img => ({
+      url: img.original,
+      title: img.title,
+      source: img.source,
+      thumbnail: img.thumbnail
+    })) || [];
+  } catch (error) {
+    console.error("Image search error:", error);
+    return [];
+  }
+};
+
+// Helper function to search for educational videos
+const searchEducationalVideos = async (topic) => {
+  try {
+    const response = await youtube.search.list({
+      key: process.env.YOUTUBE_API_KEY,
+      part: 'snippet',
+      q: `${topic} tutorial explanation educational`,
+      type: 'video',
+      videoDuration: 'medium', // 4-20 minutes
+      maxResults: 3,
+      relevanceLanguage: 'en',
+      safeSearch: 'strict'
+    });
+
+    return response.data.items?.map(video => ({
+      videoId: video.id.videoId,
+      title: video.snippet.title,
+      description: video.snippet.description,
+      thumbnail: video.snippet.thumbnails.medium.url,
+      embedUrl: `https://www.youtube.com/embed/${video.id.videoId}`,
+      channelTitle: video.snippet.channelTitle,
+      publishedAt: video.snippet.publishedAt
+    })) || [];
+  } catch (error) {
+    console.error("YouTube search error:", error);
+    return [];
+  }
+};
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage();
@@ -1893,7 +1953,7 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Mind Map Node Description Endpoint - New endpoint for detailed node descriptions
+// Mind Map Node Description Endpoint - Enhanced with multimedia content
 app.post("/api/mindmap/node-description", verifyToken, async (req, res) => {
   try {
     const { nodeId, nodeLabel, syllabus, parentNodes, childNodes } = req.body;
@@ -1905,7 +1965,36 @@ app.post("/api/mindmap/node-description", verifyToken, async (req, res) => {
       });
     }
 
-    console.log(`Generating detailed description for node: ${nodeLabel} (${nodeId})`);
+    console.log(`Generating enhanced description for node: ${nodeLabel} (${nodeId})`);    // Start all searches in parallel for better performance
+    const [searchResults, images, videos] = await Promise.allSettled([
+      // Search for relevant web content
+      tavilyClient.search(`${nodeLabel} explanation tutorial examples educational`, {
+        search_depth: "basic",
+        max_results: 5,
+        include_answer: true,
+        include_raw_content: false,
+        include_images: false
+      }).catch(err => {
+        console.error("Tavily search error:", err);
+        return { results: [] };
+      }),
+      
+      // Search for relevant images
+      searchImages(nodeLabel).catch(err => {
+        console.error("Image search error:", err);
+        return [];
+      }),
+      
+      // Search for educational videos
+      searchEducationalVideos(nodeLabel).catch(err => {
+        console.error("Video search error:", err);
+        return [];
+      })
+    ]);    // Extract results from settled promises
+    const webResults = searchResults.status === 'fulfilled' ? 
+      (searchResults.value?.results || []) : [];
+    const imageResults = images.status === 'fulfilled' ? images.value : [];
+    const videoResults = videos.status === 'fulfilled' ? videos.value : [];
 
     // Initialize Groq client with API key from environment variables
     const groq = new Groq({
@@ -1921,21 +2010,28 @@ app.post("/api/mindmap/node-description", verifyToken, async (req, res) => {
         "";
       const childContext = childNodes && childNodes.length > 0 ? 
         `This topic includes subtopics: ${childNodes.map(n => n.label).join(", ")}` : 
-        "";      // Create the prompt for the AI
+        "";      // Prepare web search context
+      const webContext = webResults.length > 0 ? 
+        `\n\nAdditional web resources found:\n${webResults.slice(0, 3).map(result => 
+          `- ${result.title}: ${result.content?.substring(0, 150) || result.raw_content?.substring(0, 150) || 'No description available'}...`
+        ).join('\n')}` : '';
+
+      // Create the prompt for the AI
       nodeDescription = await groq.chat.completions.create({
         messages: [
           {
             role: "system",
-            content: `You are an exceptional educational AI designed to create detailed, informative, and engaging learning content about any topic. When given a topic and context, you will generate a comprehensive explanation (300-400 words) that is perfectly formatted for educational purposes.
+            content: `You are an exceptional educational AI designed to create detailed, informative, and engaging learning content about any topic. When given a topic and context, you will generate a comprehensive explanation (350-450 words) that is perfectly formatted for educational purposes.
 
 Your response should:
-1. Be comprehensive and educational (300-400 words)
+1. Be comprehensive and educational (350-450 words)
 2. Include proper formatting with markdown headings, bullet points, and emphasis where appropriate
 3. Include KaTeX mathematical equations when relevant (using LaTeX syntax with $$ for display equations and $ for inline equations)
 4. Include code snippets with proper syntax highlighting when relevant to programming or technical topics
 5. Be tailored to the specific topic, considering its context, parent topics, and subtopics
 6. Be academically rigorous yet accessible, with clear explanations of complex concepts
 7. Include concrete examples, applications, or analogies where appropriate
+8. Reference or incorporate insights from provided web resources when relevant
 
 Formatting requirements:
 - Use markdown formatting (## for headings, * for bullet points, etc.)
@@ -1949,6 +2045,8 @@ Formatting requirements:
   * Examples, applications or visualizations described (where relevant)
   * Brief conclusion or connection to related concepts
 
+At the end, include a "## 📚 Further Learning" section that mentions the availability of visual resources and educational videos for deeper understanding.
+
 Your explanation should be authoritative, academically accurate, and designed to enhance understanding of the topic in its educational context.`
           },
           {
@@ -1960,13 +2058,14 @@ ${nodeContext}
 
 ${parentContext}
 ${childContext}
+${webContext}
 
-Please provide a 300-400 word detailed description with proper formatting, including any necessary equations (using KaTeX/LaTeX syntax), code examples, or visual descriptions as appropriate for this specific topic.`,
+Please provide a 350-450 word detailed description with proper formatting, including any necessary equations (using KaTeX/LaTeX syntax), code examples, or visual descriptions as appropriate for this specific topic.`,
           }
         ],
         model: "llama-3.3-70b-versatile",
         temperature: 0.2,
-        max_tokens: 1024,
+        max_tokens: 1200,
         top_p: 0.9
       });
     } catch (descriptionError) {
@@ -1980,20 +2079,48 @@ Please provide a 300-400 word detailed description with proper formatting, inclu
 
     // Extract the content from the response
     const descriptionContent = nodeDescription.choices[0]?.message?.content || "";
+
+    // Prepare multimedia content for response
+    const multimedia = {
+      images: imageResults.slice(0, 3).map(img => ({
+        url: img.url,
+        title: img.title || `${nodeLabel} illustration`,
+        source: img.source,
+        thumbnail: img.thumbnail
+      })),
+      videos: videoResults.slice(0, 2).map(video => ({
+        videoId: video.videoId,
+        title: video.title,
+        description: video.description?.substring(0, 150) + (video.description?.length > 150 ? '...' : ''),
+        thumbnail: video.thumbnail,
+        embedUrl: video.embedUrl,
+        channelTitle: video.channelTitle,
+        publishedAt: video.publishedAt
+      })),      references: webResults.slice(0, 5).map(result => ({
+        title: result.title,
+        url: result.url,
+        snippet: (result.content || result.raw_content || '')?.substring(0, 200) + ((result.content || result.raw_content || '').length > 200 ? '...' : ''),
+        score: result.score || 0
+      }))
+    };
+
+    console.log(`Enhanced description generated with ${multimedia.images.length} images, ${multimedia.videos.length} videos, and ${multimedia.references.length} references`);
     
-    // Return the generated description
+    // Return the enhanced description with multimedia content
     return res.json({
       success: true,
-      description: descriptionContent
+      description: descriptionContent,
+      multimedia: multimedia
     });
 
   } catch (error) {
-    console.error("Error generating node description:", error);
+    console.error("Error generating enhanced node description:", error);
     return res.status(500).json({
       success: false,
-      error: "Failed to generate node description",
+      error: "Failed to generate enhanced node description",
       details: error.message,
-    });  }
+    });
+  }
 });
 
 // Mind Map Podcast Generation Endpoint
