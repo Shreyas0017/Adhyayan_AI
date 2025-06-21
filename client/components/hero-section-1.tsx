@@ -1,5 +1,6 @@
 import React from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowRight, ChevronRight, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button1'
 import { AnimatedGroup } from '@/components/ui/animated-group'
@@ -17,7 +18,7 @@ const transitionVariants = {
             filter: 'blur(0px)',
             y: 0,
             transition: {
-                type: 'spring',
+                type: 'spring' as const,
                 bounce: 0.3,
                 duration: 1.5,
             },
@@ -98,13 +99,15 @@ export function HeroSection() {
                                     },
                                 },
                             }}
-                            className="absolute inset-0 -z-20">
-                            <img
+                        >
+                            <Image
                                 src="https://ik.imagekit.io/lrigu76hy/tailark/night-background.jpg?updatedAt=1745733451120"
                                 alt="background"
                                 className="absolute inset-x-0 top-56 -z-20 hidden lg:top-32 dark:block"
-                                width="3276"
-                                height="4095"
+                                width={3276}
+                                height={4095}
+                                priority
+                                unoptimized
                             />
                         </AnimatedGroup>
                         <div aria-hidden className="absolute inset-0 -z-10 size-full [background:radial-gradient(125%_125%_at_50%_100%,transparent_0%,var(--background)_75%)]" />
@@ -175,19 +178,21 @@ export function HeroSection() {
                                     className="bg-gradient-to-b to-background absolute inset-0 z-10 from-transparent from-35%"
                                 />
                                 <div className="inset-shadow-2xs ring-background dark:inset-shadow-white/20 bg-background relative mx-auto max-w-6xl overflow-hidden rounded-2xl border p-4 shadow-lg shadow-zinc-950/15 ring-1">
-                                    <img
+                                    <Image
                                         className="bg-background aspect-15/8 relative hidden rounded-2xl dark:block"
                                         src="https://tailark.com//_next/image?url=%2Fmail2.png&w=3840&q=75"
                                         alt="app screen"
-                                        width="2700"
-                                        height="1440"
+                                        width={2700}
+                                        height={1440}
+                                        unoptimized
                                     />
-                                    <img
+                                    <Image
                                         className="z-2 border-border/25 aspect-15/8 relative rounded-2xl border dark:hidden"
                                         src="https://tailark.com/_next/image?url=%2Fmail2-light.png&w=3840&q=75"
                                         alt="app screen"
-                                        width="2700"
-                                        height="1440"
+                                        width={2700}
+                                        height={1440}
+                                        unoptimized
                                     />
                                 </div>
                             </div>
