@@ -60,12 +60,14 @@ export async function POST(
       userId,
       userName,
       joinedAt: new Date(),
+      lastActivity: new Date(),
       score: 0,
       correctAnswers: 0,
       averageResponseTime: 0,
       isReady: false,
       currentQuestionIndex: 0,
-      isFinished: false
+      isFinished: false,
+      timeExtensions: 0
     };
 
     // Add participant to room and update prize pool
