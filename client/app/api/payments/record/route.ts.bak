@@ -1,0 +1,78 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Initialize Firebase Admin if not already initialized
+if (!getApps().length) {
+  const serviceAccountPath = path.join(process.cwd(), '../server/adhyayan-e86cb-firebase-adminsdk-fbsvc-83e80e7781.json');
+  
+  if (fs.existsSync(serviceAccountPath)) {
+    const serviceAccount = require(serviceAccountPath);
+    initializeApp({
+      credential: cert(serviceAccount)
+    });
+  } else {
+    console.error('Firebase service account file not found');
+  }
+}
+
+    if (!userId || !transactionHash || !planId || !amount || !paymentMethod) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    // Access firestore
+    const firestore = getFirestore(getApp());
+
+    // Add the payment record
+    const paymentRecord = {
+      userId,
+      walletAddress: walletAddress || null,
+      transactionHash,
+      planId,
+      amount,
+      paymentMethod,
+      status: status || 'completed',
+      createdAt: Timestamp.now(),
+    };
+
+    const docRef = await addDoc(collection(firestore, 'payments'), paymentRecord);
+
+    // Update user account with subscription info
+    const userRef = collection(firestore, 'users');
+    const userQuery = await userRef.where('userId', '==', userId).get();
+
+    if (!userQuery.empty) {
+      const userDoc = userQuery.docs[0];
+      await userDoc.ref.update({
+        subscriptionPlanId: planId,
+        subscriptionStatus: 'active',
+        subscriptionStartDate: Timestamp.now(),
+        // Set end date based on plan duration
+        paymentHistory: firebase.firestore.FieldValue.arrayUnion({
+          paymentId: docRef.id,
+          date: Timestamp.now(),
+          amount,
+          method: paymentMethod,
+        }),
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      paymentId: docRef.id,
+      message: 'Payment recorded successfully',
+    });
+  } catch (error) {
+    console.error('Error recording payment:', error);
+    return NextResponse.json(
+      { error: 'Failed to record payment' },
+      { status: 500 }
+    );
+  }
+}

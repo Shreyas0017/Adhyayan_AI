@@ -1,0 +1,442 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Force dark mode globally */
+* {
+  color-scheme: dark;
+}
+
+html {
+  background-color: #0a0a0a;
+  color: #ffffff;
+}
+
+body {
+  background-color: #0a0a0a !important;
+  color: #ffffff !important;
+}
+
+/* Override any potential light mode styles */
+html:not(.dark) {
+  background-color: #0a0a0a !important;
+  color: #ffffff !important;
+}
+
+html:not(.dark) body {
+  background-color: #0a0a0a !important;
+  color: #ffffff !important;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: "Outfit", sans-serif;
+  --font-mono: "Outfit", sans-serif;
+  --animate-scroll: scroll var(--animation-duration, 40s) var(--animation-direction, forwards) linear infinite;
+
+  @keyframes scroll {
+    to {
+      transform: translate(calc(-50% - 0.5rem));
+    }
+  }
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+  
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-["Outfit",_sans-serif];
+  }
+}
+
+/* Enhanced FAQ smooth animations */
+.faq-disclosure-panel {
+  transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
+              opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              padding 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Ensure smooth transitions without layout shifts */
+.faq-item {
+  will-change: auto;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+/* Custom scrollbar for better aesthetics */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Outfit font utility classes */
+.outfit-thin {
+  font-family: "Outfit", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 100;
+  font-style: normal;
+}
+
+.outfit-extralight {
+  font-family: "Outfit", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 200;
+  font-style: normal;
+}
+
+.outfit-light {
+  font-family: "Outfit", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 300;
+  font-style: normal;
+}
+
+.outfit-regular {
+  font-family: "Outfit", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+}
+
+.outfit-medium {
+  font-family: "Outfit", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-style: normal;
+}
+
+.outfit-semibold {
+  font-family: "Outfit", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 600;
+  font-style: normal;
+}
+
+.outfit-bold {
+  font-family: "Outfit", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 700;
+  font-style: normal;
+}
+
+.outfit-extrabold {
+  font-family: "Outfit", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 800;
+  font-style: normal;
+}
+
+.outfit-black {
+  font-family: "Outfit", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 900;
+  font-style: normal;
+}
+
+/* Force dark mode globally to prevent light mode flashing */
+* {
+  color-scheme: dark;
+}
+
+html {
+  background-color: #0a0a0a;
+  color: #ffffff;
+}
+
+body {
+  background-color: #0a0a0a !important;
+  color: #ffffff !important;
+}
+
+/* Override any potential light mode styles */
+html:not(.dark) {
+  background-color: #0a0a0a !important;
+  color: #ffffff !important;
+}
+
+html:not(.dark) body {
+  background-color: #0a0a0a !important;
+  color: #ffffff !important;
+}
+
+/* Ensure all text remains white in dark mode */
+.dark, .dark * {
+  color: white;
+}
+
+/* Override any component that might try to use light colors */
+:root {
+  color-scheme: dark;
+}
+
+/* Override system preferences - force dark mode regardless of user's system setting */
+@media (prefers-color-scheme: light) {
+  html {
+    background-color: #0a0a0a !important;
+    color: #ffffff !important;
+  }
+  
+  body {
+    background-color: #0a0a0a !important;
+    color: #ffffff !important;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  html {
+    background-color: #0a0a0a !important;
+    color: #ffffff !important;
+  }
+  
+  body {
+    background-color: #0a0a0a !important;
+    color: #ffffff !important;
+  }
+}
+
+/* Remove all focus outlines and white borders */
+input:focus,
+textarea:focus,
+input:focus-visible,
+textarea:focus-visible,
+.nextui-input input:focus,
+.nextui-textarea textarea:focus,
+[data-slot="input"]:focus,
+[data-slot="input-wrapper"]:focus-within,
+[data-slot="input-wrapper"]:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: inherit !important;
+}
+
+/* Ensure no webkit focus rings */
+input:focus,
+textarea:focus,
+select:focus,
+button:focus {
+  outline: none !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  -webkit-focus-ring-color: transparent !important;
+}
+
+/* Remove any potential NextUI default focus styles */
+.nextui-input-wrapper:focus-within,
+.nextui-textarea-wrapper:focus-within {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Animation for mind map cards */
+@keyframes mindmap-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-mindmap-fade-in {
+  animation: mindmap-fade-in 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+/* Ensure home page elements don't get affected by other styles */
+.home-page-container button,
+.home-page-container .button-container {
+  pointer-events: auto !important;
+}
+
+/* Fix any potential z-index issues on home page */
+.home-page-navbar {
+  position: relative;
+  z-index: 100;
+}
+
+.home-page-hero {
+  position: relative;
+  z-index: 50;
+}
+
+/* Ensure theme toggle maintains proper positioning */
+.home-page-navbar .switch,
+.home-page-navbar .theme-toggle {
+  position: relative !important;
+  z-index: 101 !important;
+}
+
+/* Fix Learn More page navbar */
+.learn-more-page .switch,
+.learn-more-page .theme-toggle {
+  position: relative !important;
+  z-index: 101 !important;
+}
+
+.learn-more-page nav {
+  position: relative !important;
+  z-index: 100 !important;
+}
+
+/* Ensure wavy background stays behind content */
+.learn-more-page .wavy-background {
+  z-index: 0 !important;
+}
+
+.learn-more-page section {
+  position: relative;
+  z-index: 10;
+}
+
+/* Fix button text contrast */
+.learn-more-page button.bg-white {
+  color: #000 !important;
+  background-color: #fff !important;
+}
+
+.learn-more-page button.bg-white:hover {
+  color: #000 !important;
+  background-color: #e5e5e5 !important;
+}
+
+.learn-more-page button.bg-white .lucide {
+  color: #000 !important;
+}
+
+.learn-more-page button.bg-white svg {
+  color: #000 !important;
+  fill: #000 !important;
+}
+
+.home-page-hero img.object-cover,
+.home-page-hero .object-cover {
+  pointer-events: none !important;
+}
+
+
+.google-sign-in-btn {
+  position: relative !important;
+  z-index: 9999 !important;
+}
+
+
