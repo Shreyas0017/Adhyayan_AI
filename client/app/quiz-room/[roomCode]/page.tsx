@@ -2,6 +2,7 @@
 import React, { useState, useEffect, use, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
+import { FloatingDock } from "@/components/ui/floating-dock";
 import { WavyBackground } from "@/components/ui/wavy-background";
 import BlackHoleLoader from "@/components/ui/black-hole-loader";
 import { GyanPointsDisplay } from "@/components/custom/GyanPointsDisplay";
@@ -14,7 +15,15 @@ import {
   IconCopy,
   IconCheck,
   IconX,
-  IconLoader2
+  IconLoader2,
+  IconClockHour4,
+  IconClockExclamation,
+  IconHome,
+  IconBrain,
+  IconSettings,
+  IconLogout,
+  IconMap,
+  IconList,
 } from "@tabler/icons-react";
 
 interface QuizRoomProps {
@@ -22,6 +31,57 @@ interface QuizRoomProps {
 }
 
 // Memoized components for better performance
+const CountdownTimer = React.memo(({ timeUntilDeletion, onExtend, canExtend, extensionsRemaining }: any) => {
+  if (!timeUntilDeletion || timeUntilDeletion <= 0) return null;
+  
+  const minutes = Math.floor(timeUntilDeletion / (1000 * 60));
+  const seconds = Math.floor((timeUntilDeletion % (1000 * 60)) / 1000);
+  const isUrgent = timeUntilDeletion < 2 * 60 * 1000; // Less than 2 minutes
+  
+  return (
+    <div className={`bg-black/60 backdrop-blur-sm border rounded-lg p-4 ${
+      isUrgent ? 'border-red-500/50 bg-red-500/10' : 'border-yellow-500/50 bg-yellow-500/10'
+    }`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {isUrgent ? (
+            <IconClockExclamation className="h-6 w-6 text-red-400" />
+          ) : (
+            <IconClockHour4 className="h-6 w-6 text-yellow-400" />
+          )}
+          <div>
+            <div className={`text-sm font-medium ${isUrgent ? 'text-red-400' : 'text-yellow-400'}`}>
+              Room Auto-Delete Timer
+            </div>
+            <div className={`text-lg font-mono font-bold ${isUrgent ? 'text-red-300 animate-pulse' : 'text-yellow-300'}`}>
+              {minutes}:{seconds.toString().padStart(2, '0')}
+            </div>
+          </div>
+        </div>
+        {canExtend && (
+          <button
+            onClick={onExtend}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition-all duration-200 flex items-center gap-2"
+          >
+            <IconClock className="h-4 w-4" />
+            +10 min ({extensionsRemaining} left)
+          </button>
+        )}
+      </div>
+      {isUrgent && (
+        <div className="text-xs text-red-300 mt-2 flex items-center gap-1">
+          ⚠️ Room will be deleted soon! Extend to keep playing.
+        </div>
+      )}
+      {!canExtend && (
+        <div className="text-xs text-neutral-400 mt-2">
+          Maximum extensions used. Room will auto-delete when timer reaches zero.
+        </div>
+      )}
+    </div>
+  );
+});
+
 const ParticipantsList = React.memo(({ participants, hostId, status }: any) => (
   <div className="space-y-2">
     {participants.map((participant: any) => (
@@ -106,8 +166,69 @@ export default function QuizRoom({ params }: QuizRoomProps) {
   const resolvedParams = use(params);
   const { roomCode } = resolvedParams;
   
-  const { user, loading, isAuthenticated } = useAuth();
+  const { user, loading, isAuthenticated, logout } = useAuth();
   const router = useRouter();
+
+  const handleSignOut = async () => {
+    try {
+      await logout();
+      router.push('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+  const dockLinks = [
+    {
+      title: "Home",
+      icon: (
+        <IconHome className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/",
+    },
+    {
+      title: "Dashboard",
+      icon: (
+        <IconBrain className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/dashboard",
+    },
+    {
+      title: "Quiz",
+      icon: (
+        <IconUsers className="h-full w-full text-red-400 dark:text-red-400" />
+      ),
+      href: "/create-room",
+    },
+    {
+      title: "Mind Map",
+      icon: (
+        <IconMap className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/mind-map",
+    },
+    {
+      title: "Flash Cards",
+      icon: (
+        <IconList className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/flashCard",
+    },
+    {
+      title: "Settings",
+      icon: (
+        <IconSettings className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/settings",
+    },
+    {
+      title: "Sign Out",
+      icon: (
+        <IconLogout className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "#",
+      onClick: handleSignOut,
+    },
+  ];
   
   // Consolidated state for better performance
   const [gameState, setGameState] = useState({
@@ -122,7 +243,11 @@ export default function QuizRoom({ params }: QuizRoomProps) {
     results: null as any,
     copied: false,
     isSubmitting: false,
-    currentQuestionIndex: -1
+    currentQuestionIndex: -1,
+    autoDeleteAt: null as Date | null,
+    timeUntilDeletion: null as number | null,
+    canExtendTimeout: true,
+    extensionsRemaining: 3
   });
 
   // Refs for timers and tracking
@@ -155,6 +280,16 @@ export default function QuizRoom({ params }: QuizRoomProps) {
         const newState = { ...prev };
         newState.roomState = data.room;
         newState.currentParticipant = data.currentParticipant;
+        newState.autoDeleteAt = data.autoDeleteAt ? new Date(data.autoDeleteAt) : null;
+        newState.timeUntilDeletion = data.timeUntilDeletion;
+        
+        // Update extension info
+        if (data.currentParticipant) {
+          const maxExtensions = 3;
+          const usedExtensions = data.currentParticipant.timeExtensions || 0;
+          newState.extensionsRemaining = maxExtensions - usedExtensions;
+          newState.canExtendTimeout = usedExtensions < maxExtensions;
+        }
         
         // Only update if there's a real change
         if (data.room.status === 'active' && data.currentQuestion && data.currentParticipant && !data.currentParticipant.isFinished) {
@@ -212,7 +347,104 @@ export default function QuizRoom({ params }: QuizRoomProps) {
     };
   }, [gameState.timeLeft, gameState.quizPhase, gameState.answered, gameState.isSubmitting]);
 
-  // Initialize with optimized polling
+  // Cleanup function for leaving room
+  const leaveRoom = useCallback(async () => {
+    if (!roomCode || !user?.uid) return;
+    
+    try {
+      await fetch(`/api/rooms/${roomCode}/leave`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid }),
+      });
+    } catch (error) {
+      console.error('Error leaving room:', error);
+    }
+  }, [roomCode, user?.uid]);
+
+  // Extend room timeout function
+  const extendTimeout = useCallback(async () => {
+    if (!roomCode || !user?.uid || !gameState.canExtendTimeout) return;
+    
+    try {
+      const response = await fetch(`/api/rooms/${roomCode}/extend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid }),
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        setGameState(prev => ({
+          ...prev,
+          extensionsRemaining: result.extensionsRemaining,
+          canExtendTimeout: result.extensionsRemaining > 0,
+          autoDeleteAt: new Date(result.newTimeout),
+          timeUntilDeletion: result.newTimeout - Date.now()
+        }));
+        
+        // Show success message
+        alert(`Room timeout extended by ${result.extensionDuration} minutes! ${result.extensionsRemaining} extensions remaining.`);
+        
+        // Refresh room state
+        fetchRoomState();
+      } else {
+        const error = await response.json();
+        alert(`Failed to extend timeout: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Error extending timeout:', error);
+      alert('Network error. Failed to extend room timeout.');
+    }
+  }, [roomCode, user?.uid, gameState.canExtendTimeout, fetchRoomState]);
+
+  // Timer effect for countdown updates
+  useEffect(() => {
+    if (!gameState.timeUntilDeletion || gameState.timeUntilDeletion <= 0) return;
+    
+    const interval = setInterval(() => {
+      setGameState(prev => {
+        if (!prev.autoDeleteAt) return prev;
+        
+        const newTimeUntilDeletion = prev.autoDeleteAt.getTime() - Date.now();
+        
+        if (newTimeUntilDeletion <= 0) {
+          // Room has been deleted, redirect
+          router.push('/create-room');
+          return prev;
+        }
+        
+        return {
+          ...prev,
+          timeUntilDeletion: newTimeUntilDeletion
+        };
+      });
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [gameState.autoDeleteAt, router]);
+
+  // Handle page unload/refresh to leave room
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      leaveRoom();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        leaveRoom();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      leaveRoom(); // Leave room when component unmounts
+    };
+  }, [leaveRoom]);
   useEffect(() => {
     if (!isAuthenticated || !roomCode || !user || isInitializedRef.current) return;
     
@@ -371,6 +603,18 @@ export default function QuizRoom({ params }: QuizRoomProps) {
         </div>
 
         <div className="max-w-4xl w-full mx-auto">
+          {/* Countdown Timer - Show on all phases except loading */}
+          {gameState.timeUntilDeletion && gameState.timeUntilDeletion > 0 && (
+            <div className="mb-6">
+              <CountdownTimer
+                timeUntilDeletion={gameState.timeUntilDeletion}
+                onExtend={extendTimeout}
+                canExtend={gameState.canExtendTimeout}
+                extensionsRemaining={gameState.extensionsRemaining}
+              />
+            </div>
+          )}
+
           {/* Waiting Phase */}
           {gameState.quizPhase === 'waiting' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -408,18 +652,46 @@ export default function QuizRoom({ params }: QuizRoomProps) {
                     <p className="text-neutral-400 mb-4">
                       🤖 AI questions generated and ready. Waiting for participants...
                     </p>
-                    <button
-                      onClick={startQuiz}
-                      disabled={gameState.roomState.participants.length < 2}
-                      className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-3 px-6 rounded-lg transition-all duration-300"
-                    >
-                      Start Quiz
-                    </button>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={startQuiz}
+                        disabled={gameState.roomState.participants.length < 2}
+                        className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-3 px-6 rounded-lg transition-all duration-300"
+                      >
+                        Start Quiz
+                      </button>
+                      <button
+                        onClick={async () => {
+                          await leaveRoom();
+                          router.push('/create-room');
+                        }}
+                        className="bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-6 rounded-lg transition-all duration-300"
+                      >
+                        Leave
+                      </button>
+                    </div>
                     {gameState.roomState.participants.length < 2 && (
                       <p className="text-sm text-yellow-400 mt-2">
                         Need at least 2 participants to start
                       </p>
                     )}
+                  </div>
+                )}
+
+                {!isHost && (
+                  <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-lg p-6">
+                    <p className="text-neutral-400 mb-4">
+                      Waiting for the host to start the quiz...
+                    </p>
+                    <button
+                      onClick={async () => {
+                        await leaveRoom();
+                        router.push('/create-room');
+                      }}
+                      className="bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-6 rounded-lg transition-all duration-300"
+                    >
+                      Leave Room
+                    </button>
                   </div>
                 )}
               </div>
@@ -488,19 +760,31 @@ export default function QuizRoom({ params }: QuizRoomProps) {
                 </div>
 
                 {/* Submit Button */}
-                <button
-                  onClick={() => submitAnswer()}
-                  disabled={gameState.selectedAnswer === -1 || gameState.answered || gameState.isSubmitting}
-                  className={`w-full py-3 px-6 rounded-lg font-medium transition-all duration-300 ${
-                    gameState.selectedAnswer === -1 || gameState.answered || gameState.isSubmitting
-                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
-                  }`}
-                >
-                  {gameState.isSubmitting ? 'Submitting...' : 
-                   gameState.answered ? 'Answer Submitted ✓' : 
-                   gameState.selectedAnswer === -1 ? 'Select an Answer' : 'Submit Answer'}
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => submitAnswer()}
+                    disabled={gameState.selectedAnswer === -1 || gameState.answered || gameState.isSubmitting}
+                    className={`flex-1 py-3 px-6 rounded-lg font-medium transition-all duration-300 ${
+                      gameState.selectedAnswer === -1 || gameState.answered || gameState.isSubmitting
+                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
+                  >
+                    {gameState.isSubmitting ? 'Submitting...' : 
+                     gameState.answered ? 'Answer Submitted ✓' : 
+                     gameState.selectedAnswer === -1 ? 'Select an Answer' : 'Submit Answer'}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await leaveRoom();
+                      router.push('/create-room');
+                    }}
+                    className="bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-300"
+                    title="Leave Quiz"
+                  >
+                    Leave
+                  </button>
+                </div>
 
                 {/* Explanation */}
                 {gameState.showExplanation && gameState.currentQuestion.explanation && (
@@ -624,15 +908,31 @@ export default function QuizRoom({ params }: QuizRoomProps) {
                     Back to Rooms
                   </button>
                   <button
+                    onClick={async () => {
+                      await leaveRoom();
+                      router.push('/create-room');
+                    }}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-6 rounded-lg transition-all duration-300"
+                  >
+                    Leave Room
+                  </button>
+                  <button
                     onClick={() => window.location.reload()}
                     className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-all duration-300"
                   >
                     Play Again
                   </button>
                 </div>
-              </div>
-            </div>
+              </div>            </div>
           )}
+        </div>
+
+        {/* Floating Dock positioned like macOS taskbar */}
+        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+          <FloatingDock
+            mobileClassName="translate-y-20"
+            items={dockLinks}
+          />
         </div>
       </WavyBackground>
     </div>
