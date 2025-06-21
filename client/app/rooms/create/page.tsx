@@ -21,6 +21,7 @@ interface RoomSettings {
   questionCount: number;
   timePerQuestion: number;
   maxParticipants: number;
+  isPublic: boolean;
 }
 
 export default function CreateRoomPage() {
@@ -34,14 +35,15 @@ export default function CreateRoomPage() {
     difficulty: 'medium',
     questionCount: 10,
     timePerQuestion: 30,
-    maxParticipants: 8
+    maxParticipants: 8,
+    isPublic: true
   });
   
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(1);
 
-  const handleInputChange = (field: keyof RoomSettings, value: string | number) => {
+  const handleInputChange = (field: keyof RoomSettings, value: string | number | boolean) => {
     setSettings(prev => ({ ...prev, [field]: value }));
     setError(null);
   };
@@ -334,6 +336,37 @@ export default function CreateRoomPage() {
                 <div className="flex justify-between text-xs text-neutral-400 mt-1">
                   <span>2 players</span>
                   <span>20 players</span>
+                </div>
+              </div>
+
+              {/* Room Privacy */}
+              <div>
+                <label className="block text-white text-sm font-medium mb-3">
+                  Room Privacy
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => handleInputChange('isPublic', true)}
+                    className={`p-4 rounded-lg border transition-all duration-200 ${
+                      settings.isPublic
+                        ? 'border-green-500 bg-green-500/20'
+                        : 'border-white/20 bg-white/10 hover:bg-white/20'
+                    }`}
+                  >
+                    <div className="font-medium text-green-400">Public Room</div>
+                    <div className="text-sm text-neutral-400 mt-1">Others can find and join randomly</div>
+                  </button>
+                  <button
+                    onClick={() => handleInputChange('isPublic', false)}
+                    className={`p-4 rounded-lg border transition-all duration-200 ${
+                      !settings.isPublic
+                        ? 'border-purple-500 bg-purple-500/20'
+                        : 'border-white/20 bg-white/10 hover:bg-white/20'
+                    }`}
+                  >
+                    <div className="font-medium text-purple-400">Private Room</div>
+                    <div className="text-sm text-neutral-400 mt-1">Only accessible with room code</div>
+                  </button>
                 </div>
               </div>
 
