@@ -15,7 +15,8 @@ import {
   IconMap,
   IconDeviceGamepad2,
   IconUsersGroup,
-  IconWorld
+  IconWorld,
+  IconList
 } from "@tabler/icons-react";
 
 export default function CreateRoom() {
@@ -43,7 +44,6 @@ export default function CreateRoom() {
     router.push('/');
     return null;
   }
-
   const dockLinks = [
     {
       title: "Home",
@@ -60,9 +60,9 @@ export default function CreateRoom() {
       href: "/dashboard",
     },
     {
-      title: "Create Room",
+      title: "Quiz",
       icon: (
-        <IconUsers className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+        <IconUsers className="h-full w-full text-red-400 dark:text-red-400" />
       ),
       href: "/create-room",
     },
@@ -72,6 +72,12 @@ export default function CreateRoom() {
         <IconMap className="h-full w-full text-neutral-500 dark:text-neutral-300" />
       ),
       href: "/mind-map",
+    },    {
+      title: "Flash Cards",
+      icon: (
+        <IconList className="h-full w-full text-neutral-500 dark:text-neutral-300" />
+      ),
+      href: "/flashCard",
     },
     {
       title: "Settings",
@@ -206,13 +212,11 @@ export default function CreateRoom() {
                 </button>
               </div>
             </div>
-          </div>
-
-
-          <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+          </div>          <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
             <FloatingDock
               mobileClassName="translate-y-20"
               items={dockLinks}
+              activeItem="/rooms"
             />
           </div>
         </main>
