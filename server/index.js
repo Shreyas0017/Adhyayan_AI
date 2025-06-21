@@ -18,7 +18,7 @@ const { transformGroqResponse } = require("./transform"); // Import the transfor
 const ElevenLabsService = require("./elevenlabs-service"); // Import the ElevenLabs service
 const { tavily } = require("@tavily/core");
 const { getJson } = require("serpapi");
-const { google } = require('googleapis');
+const { google } = require("googleapis");
 require("dotenv").config();
 
 // Ensure JWT_SECRET exists or use a fallback for development
@@ -34,15 +34,18 @@ if (!process.env.JWT_SECRET) {
 const app = express();
 // Production - restrict to your frontend domain
 const corsOptions = {
-   origin: process.env.FRONTEND_URL || 'https://adhyayan-ai.vercel.app',
+  origin: process.env.FRONTEND_URL || "https://adhyayan-ai.vercel.app",
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
 };
 app.use(cors(corsOptions));
 app.use(express.json());
 
 // Serve static files from public directory (for podcasts)
-app.use('/podcasts', express.static(path.join(__dirname, 'public', 'podcasts')));
+app.use(
+  "/podcasts",
+  express.static(path.join(__dirname, "public", "podcasts"))
+);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -91,7 +94,7 @@ const elevenLabsService = new ElevenLabsService(
 const tavilyClient = tavily({ apiKey: process.env.TAVILY_API_KEY });
 
 // Initialize YouTube API
-const youtube = google.youtube('v3');
+const youtube = google.youtube("v3");
 
 // Helper function to search for images using SerpAPI
 const searchImages = async (query) => {
@@ -100,15 +103,17 @@ const searchImages = async (query) => {
       engine: "google_images",
       q: `${query} tutorial diagram explanation educational`,
       api_key: process.env.SERPAPI_API_KEY,
-      num: 5
+      num: 5,
     });
-    
-    return response.images_results?.slice(0, 5).map(img => ({
-      url: img.original,
-      title: img.title,
-      source: img.source,
-      thumbnail: img.thumbnail
-    })) || [];
+
+    return (
+      response.images_results?.slice(0, 5).map((img) => ({
+        url: img.original,
+        title: img.title,
+        source: img.source,
+        thumbnail: img.thumbnail,
+      })) || []
+    );
   } catch (error) {
     console.error("Image search error:", error);
     return [];
@@ -120,24 +125,26 @@ const searchEducationalVideos = async (topic) => {
   try {
     const response = await youtube.search.list({
       key: process.env.YOUTUBE_API_KEY,
-      part: 'snippet',
+      part: "snippet",
       q: `${topic} tutorial explanation educational`,
-      type: 'video',
-      videoDuration: 'medium', // 4-20 minutes
+      type: "video",
+      videoDuration: "medium", // 4-20 minutes
       maxResults: 3,
-      relevanceLanguage: 'en',
-      safeSearch: 'strict'
+      relevanceLanguage: "en",
+      safeSearch: "strict",
     });
 
-    return response.data.items?.map(video => ({
-      videoId: video.id.videoId,
-      title: video.snippet.title,
-      description: video.snippet.description,
-      thumbnail: video.snippet.thumbnails.medium.url,
-      embedUrl: `https://www.youtube.com/embed/${video.id.videoId}`,
-      channelTitle: video.snippet.channelTitle,
-      publishedAt: video.snippet.publishedAt
-    })) || [];
+    return (
+      response.data.items?.map((video) => ({
+        videoId: video.id.videoId,
+        title: video.snippet.title,
+        description: video.snippet.description,
+        thumbnail: video.snippet.thumbnails.medium.url,
+        embedUrl: `https://www.youtube.com/embed/${video.id.videoId}`,
+        channelTitle: video.snippet.channelTitle,
+        publishedAt: video.snippet.publishedAt,
+      })) || []
+    );
   } catch (error) {
     console.error("YouTube search error:", error);
     return [];
@@ -226,46 +233,65 @@ let firebaseInitialized = false;
 const parseFirebaseServiceAccount = (serviceAccountString) => {
   try {
     const serviceAccount = JSON.parse(serviceAccountString);
-    
+
     // Fix common issues with private key formatting
     if (serviceAccount.private_key) {
       // Replace escaped newlines with actual newlines
-      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-      
+      serviceAccount.private_key = serviceAccount.private_key.replace(
+        /\\n/g,
+        "\n"
+      );
+
       // Ensure the private key starts and ends correctly
-      if (!serviceAccount.private_key.startsWith('-----BEGIN PRIVATE KEY-----')) {
-        throw new Error('Private key does not start with proper PEM header');
+      if (
+        !serviceAccount.private_key.startsWith("-----BEGIN PRIVATE KEY-----")
+      ) {
+        throw new Error("Private key does not start with proper PEM header");
       }
-      if (!serviceAccount.private_key.endsWith('-----END PRIVATE KEY-----\n')) {
-        if (serviceAccount.private_key.endsWith('-----END PRIVATE KEY-----')) {
-          serviceAccount.private_key += '\n';
+      if (!serviceAccount.private_key.endsWith("-----END PRIVATE KEY-----\n")) {
+        if (serviceAccount.private_key.endsWith("-----END PRIVATE KEY-----")) {
+          serviceAccount.private_key += "\n";
         } else {
-          throw new Error('Private key does not end with proper PEM footer');
+          throw new Error("Private key does not end with proper PEM footer");
         }
       }
     }
-    
+
     return serviceAccount;
   } catch (error) {
-    console.error('Error parsing Firebase service account:', error.message);
+    console.error("Error parsing Firebase service account:", error.message);
     throw error;
   }
 };
 
 try {
   console.log("Checking Firebase environment variables...");
-  console.log("FIREBASE_SERVICE_ACCOUNT exists:", !!process.env.FIREBASE_SERVICE_ACCOUNT);
-  console.log("GOOGLE_APPLICATION_CREDENTIALS exists:", !!process.env.GOOGLE_APPLICATION_CREDENTIALS);    
+  console.log(
+    "FIREBASE_SERVICE_ACCOUNT exists:",
+    !!process.env.FIREBASE_SERVICE_ACCOUNT
+  );
+  console.log(
+    "GOOGLE_APPLICATION_CREDENTIALS exists:",
+    !!process.env.GOOGLE_APPLICATION_CREDENTIALS
+  );
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     console.log("Initializing Firebase Admin with service account");
 
     // Parse and fix service account
-    const serviceAccount = parseFirebaseServiceAccount(process.env.FIREBASE_SERVICE_ACCOUNT);
+    const serviceAccount = parseFirebaseServiceAccount(
+      process.env.FIREBASE_SERVICE_ACCOUNT
+    );
     console.log("Service account parsed and formatted successfully");
 
     // Validate critical fields
-    if (!serviceAccount.private_key || !serviceAccount.client_email || !serviceAccount.project_id) {
-      throw new Error("Missing critical fields in service account: private_key, client_email, or project_id");
+    if (
+      !serviceAccount.private_key ||
+      !serviceAccount.client_email ||
+      !serviceAccount.project_id
+    ) {
+      throw new Error(
+        "Missing critical fields in service account: private_key, client_email, or project_id"
+      );
     }
 
     admin.initializeApp({
@@ -292,15 +318,21 @@ try {
   }
 } catch (error) {
   console.error("Error initializing Firebase Admin:", error);
-  
+
   // Log more details about the error
-  if (error.code === 'app/invalid-credential') {
+  if (error.code === "app/invalid-credential") {
     console.error("Invalid credential error - likely a malformed private key");
-    console.error("Make sure your FIREBASE_SERVICE_ACCOUNT environment variable contains valid JSON");
-    console.error("And that the private_key field has proper newline formatting");
+    console.error(
+      "Make sure your FIREBASE_SERVICE_ACCOUNT environment variable contains valid JSON"
+    );
+    console.error(
+      "And that the private_key field has proper newline formatting"
+    );
   }
-  
-  console.error("Firebase initialization failed. Authentication endpoints will not work.");
+
+  console.error(
+    "Firebase initialization failed. Authentication endpoints will not work."
+  );
 }
 
 // MongoDB connection
@@ -348,11 +380,11 @@ const checkDbConnection = (req, res, next) => {
 app.post("/api/auth/google", async (req, res) => {
   try {
     console.log("Processing Google authentication request");
-    
+
     if (!firebaseInitialized) {
       console.error("Firebase Admin not initialized");
-      return res.status(500).json({ 
-        error: "Firebase authentication not available" 
+      return res.status(500).json({
+        error: "Firebase authentication not available",
       });
     }
 
@@ -399,7 +431,10 @@ app.post("/api/auth/google", async (req, res) => {
         };
 
         await db.collection("users").insertOne(newUser);
-        console.log("New user created in database with 50 Gyan Points:", decodedToken.uid);
+        console.log(
+          "New user created in database with 50 Gyan Points:",
+          decodedToken.uid
+        );
       } else {
         // Update last login time
         await db
@@ -429,8 +464,8 @@ app.post("/api/login", async (req, res) => {
   try {
     if (!firebaseInitialized) {
       console.error("Firebase Admin not initialized");
-      return res.status(500).json({ 
-        error: "Firebase authentication not available" 
+      return res.status(500).json({
+        error: "Firebase authentication not available",
       });
     }
 
@@ -456,7 +491,8 @@ app.post("/api/login", async (req, res) => {
     if (db) {
       const existingUser = await db
         .collection("users")
-        .findOne({ uid: decodedToken.uid });      if (!existingUser) {
+        .findOne({ uid: decodedToken.uid });
+      if (!existingUser) {
         // Create new user record with 50 Gyan Points (free credits)
         const newUser = {
           uid: decodedToken.uid,
@@ -473,7 +509,10 @@ app.post("/api/login", async (req, res) => {
         };
 
         await db.collection("users").insertOne(newUser);
-        console.log("New user created in database with 50 Gyan Points:", decodedToken.uid);
+        console.log(
+          "New user created in database with 50 Gyan Points:",
+          decodedToken.uid
+        );
       } else {
         // Update last login time
         await db
@@ -504,7 +543,8 @@ app.get("/api/user", verifyToken, checkDbConnection, async (req, res) => {
     const userId = req.user.uid;
 
     // Get user from database
-    const user = await db.collection("users").findOne({ uid: userId });    if (!user) {
+    const user = await db.collection("users").findOne({ uid: userId });
+    if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
@@ -525,77 +565,94 @@ app.get("/api/user", verifyToken, checkDbConnection, async (req, res) => {
   }
 });
 // Endpoint to update user settings
-app.patch("/api/user/settings", verifyToken, checkDbConnection, async (req, res) => {
-  try {
-    const userId = req.user.uid;
-    const { settings } = req.body;
+app.patch(
+  "/api/user/settings",
+  verifyToken,
+  checkDbConnection,
+  async (req, res) => {
+    try {
+      const userId = req.user.uid;
+      const { settings } = req.body;
 
-    if (!settings) {
-      return res.status(400).json({
+      if (!settings) {
+        return res.status(400).json({
+          success: false,
+          error: "Settings object is required",
+        });
+      }
+
+      await db
+        .collection("users")
+        .updateOne({ uid: userId }, { $set: { settings } });
+
+      res.json({
+        success: true,
+        message: "Settings updated successfully",
+        settings,
+      });
+    } catch (error) {
+      console.error("Error updating user settings:", error.message);
+      res.status(500).json({
         success: false,
-        error: "Settings object is required",
+        error: "Failed to update user settings",
+        details: error.message,
       });
     }
-
-    await db
-      .collection("users")
-      .updateOne({ uid: userId }, { $set: { settings } });
-
-    res.json({
-      success: true,
-      message: "Settings updated successfully",
-      settings,
-    });
-  } catch (error) {
-    console.error("Error updating user settings:", error.message);
-    res.status(500).json({
-      success: false,
-      error: "Failed to update user settings",
-      details: error.message,
-    });
   }
-});
+);
 
 // Endpoint to get user's Gyan Points
-app.get("/api/user/gyan-points", verifyToken, checkDbConnection, async (req, res) => {
-  try {
-    const userId = req.user.uid;
+app.get(
+  "/api/user/gyan-points",
+  verifyToken,
+  checkDbConnection,
+  async (req, res) => {
+    try {
+      const userId = req.user.uid;
 
-    // Get user from database
-    const user = await db.collection("users").findOne({ uid: userId }, { projection: { gyanPoints: 1 } });
+      // Get user from database
+      const user = await db
+        .collection("users")
+        .findOne({ uid: userId }, { projection: { gyanPoints: 1 } });
 
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Return only the Gyan Points
+      res.json({
+        gyanPoints: user.gyanPoints || 0,
+      });
+    } catch (error) {
+      console.error("Error retrieving Gyan Points:", error);
+      res.status(500).json({ error: "Failed to retrieve Gyan Points" });
     }
-
-    // Return only the Gyan Points
-    res.json({
-      gyanPoints: user.gyanPoints || 0,
-    });
-  } catch (error) {
-    console.error("Error retrieving Gyan Points:", error);
-    res.status(500).json({ error: "Failed to retrieve Gyan Points" });
   }
-});
+);
 
 // MIND MAP ENDPOINTS
 
 // Endpoint to create a mind map
-app.post("/api/mindmap/create", verifyToken, checkDbConnection, async (req, res) => {
-  try {
-    const { subjectName, prompt = "", options = {} } = req.body;
+app.post(
+  "/api/mindmap/create",
+  verifyToken,
+  checkDbConnection,
+  async (req, res) => {
+    try {
+      const { subjectName, prompt = "", options = {} } = req.body;
 
-    if (!subjectName) {
-      return res.status(400).json({
-        success: false,
-        error: "Subject name is required",
-      });
-    }    console.log("Generating mind map for subject:", subjectName);
-    const completion = await openai.chat.completions.create({
-      messages: [
-        {
-          role: "system",
-          content: `You are an elite educational mind map creator with PhD-level expertise in academic curriculum design. Your mission is to create comprehensive, university-level mind maps that capture the complete breadth and depth of any academic subject.
+      if (!subjectName) {
+        return res.status(400).json({
+          success: false,
+          error: "Subject name is required",
+        });
+      }
+      console.log("Generating mind map for subject:", subjectName);
+      const completion = await openai.chat.completions.create({
+        messages: [
+          {
+            role: "system",
+            content: `You are an elite educational mind map creator with PhD-level expertise in academic curriculum design. Your mission is to create comprehensive, university-level mind maps that capture the complete breadth and depth of any academic subject.
 
 ADVANCED MIND MAP INTELLIGENCE:
 1. COMPREHENSIVE SUBJECT ANALYSIS: Understand the full scope of the subject, including core concepts, advanced topics, applications, and interconnections
@@ -657,282 +714,316 @@ CRITICAL SUCCESS CRITERIA:
 - Ensure no trailing commas or invalid characters in the JSON
 
 Create the most comprehensive academic mind map possible for the subject.`,
-        },
-        {
-          role: "user",
-          content: `Create a comprehensive, university-level mind map for: "${subjectName}"
+          },
+          {
+            role: "user",
+            content: `Create a comprehensive, university-level mind map for: "${subjectName}"
 ${prompt ? ` Additional requirements: ${prompt}` : ""}
 
 Generate a complete academic mind map covering all major areas, theories, methods, and applications of this subject.`,
-        },      ],      model: "gpt-3.5-turbo",
-      temperature: 0.2,
-      max_tokens: 3000,
-      top_p: 0.9,
-      response_format: { type: "json_object" },
-    });    console.log("OpenAI response received");
-    let jsonResponseContent;
-    try {
-      const content = completion.choices[0]?.message?.content || "";
-      console.log("Raw response length:", content.length);
-      
+          },
+        ],
+        model: "gpt-3.5-turbo",
+        temperature: 0.2,
+        max_tokens: 3000,
+        top_p: 0.9,
+        response_format: { type: "json_object" },
+      });
+      console.log("OpenAI response received");
+      let jsonResponseContent;
       try {
-        // Direct parsing since OpenAI with response_format: { type: "json_object" } returns valid JSON
-        jsonResponseContent = JSON.parse(content);
-        console.log("JSON parsed successfully on first attempt");
-      } catch (parseError) {
-        console.log("First parse attempt failed, checking for JSON code blocks");
-        
-        // Try to extract JSON from code blocks if present (fallback)
-        const jsonBlockMatch = content.match(/```json\n([\s\S]*?)\n```/);
-        if (jsonBlockMatch && jsonBlockMatch[1]) {
-          const jsonText = jsonBlockMatch[1];
-          try {
-            jsonResponseContent = JSON.parse(jsonText);
-            console.log("JSON parsed from code block");
-          } catch (innerError) {
-            console.log("JSON parsing from code block failed, trying to fix JSON");
-            const fixedJson = fixBrokenJSON(jsonText);
+        const content = completion.choices[0]?.message?.content || "";
+        console.log("Raw response length:", content.length);
+
+        try {
+          // Direct parsing since OpenAI with response_format: { type: "json_object" } returns valid JSON
+          jsonResponseContent = JSON.parse(content);
+          console.log("JSON parsed successfully on first attempt");
+        } catch (parseError) {
+          console.log(
+            "First parse attempt failed, checking for JSON code blocks"
+          );
+
+          // Try to extract JSON from code blocks if present (fallback)
+          const jsonBlockMatch = content.match(/```json\n([\s\S]*?)\n```/);
+          if (jsonBlockMatch && jsonBlockMatch[1]) {
+            const jsonText = jsonBlockMatch[1];
+            try {
+              jsonResponseContent = JSON.parse(jsonText);
+              console.log("JSON parsed from code block");
+            } catch (innerError) {
+              console.log(
+                "JSON parsing from code block failed, trying to fix JSON"
+              );
+              const fixedJson = fixBrokenJSON(jsonText);
+              jsonResponseContent = JSON.parse(fixedJson);
+              console.log("Fixed JSON parsed successfully");
+            }
+          } else {
+            console.log(
+              "No JSON code blocks found, trying to fix entire content"
+            );
+            const fixedJson = fixBrokenJSON(content);
             jsonResponseContent = JSON.parse(fixedJson);
             console.log("Fixed JSON parsed successfully");
           }
-        } else {
-          console.log("No JSON code blocks found, trying to fix entire content");
-          const fixedJson = fixBrokenJSON(content);
-          jsonResponseContent = JSON.parse(fixedJson);
-          console.log("Fixed JSON parsed successfully");
         }
+      } catch (error) {
+        console.error("JSON parsing failed:", error.message);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to parse mind map data",
+          details: error.message,
+        });
       }
+
+      const transformedData = transformGroqResponse(
+        jsonResponseContent,
+        subjectName
+      );
+      const userId = req.user.uid;
+
+      let result;
+      if (db) {
+        result = await db.collection("mindmaps").insertOne({
+          userId: userId,
+          title: subjectName,
+          data: transformedData,
+          createdAt: new Date(),
+          lastModified: new Date(),
+          prompt: prompt || "",
+          options: options || {},
+        });
+        console.log(`Mind map saved to database with ID: ${result.insertedId}`);
+      }
+
+      res.status(201).json({
+        success: true,
+        message: "Mind map created successfully",
+        mindMapId: result?.insertedId || null,
+        data: transformedData,
+      });
     } catch (error) {
-      console.error("JSON parsing failed:", error.message);
-      return res.status(500).json({
+      console.error("Error creating mind map:", error.message);
+      res.status(500).json({
         success: false,
-        error: "Failed to parse mind map data",
+        error: "Failed to create mind map",
         details: error.message,
       });
     }
-
-    const transformedData = transformGroqResponse(jsonResponseContent, subjectName);
-    const userId = req.user.uid;
-
-    let result;
-    if (db) {
-      result = await db.collection("mindmaps").insertOne({
-        userId: userId,
-        title: subjectName,
-        data: transformedData,
-        createdAt: new Date(),
-        lastModified: new Date(),
-        prompt: prompt || "",
-        options: options || {},
-      });
-      console.log(`Mind map saved to database with ID: ${result.insertedId}`);
-    }
-
-    res.status(201).json({
-      success: true,
-      message: "Mind map created successfully",
-      mindMapId: result?.insertedId || null,
-      data: transformedData,
-    });
-  } catch (error) {
-    console.error("Error creating mind map:", error.message);
-    res.status(500).json({
-      success: false,
-      error: "Failed to create mind map",
-      details: error.message,
-    });
   }
-});
+);
 
 // Endpoint to get a mind map by ID
-app.get("/api/mindmap/:id", verifyToken, checkDbConnection, async (req, res) => {
-  try {
-    const mindMapId = req.params.id;
+app.get(
+  "/api/mindmap/:id",
+  verifyToken,
+  checkDbConnection,
+  async (req, res) => {
+    try {
+      const mindMapId = req.params.id;
 
-    if (!ObjectId.isValid(mindMapId)) {
-      return res.status(400).json({
+      if (!ObjectId.isValid(mindMapId)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid mind map ID format",
+        });
+      }
+
+      const mindMap = await db.collection("mindmaps").findOne({
+        _id: new ObjectId(mindMapId),
+      });
+
+      if (!mindMap) {
+        return res.status(404).json({
+          success: false,
+          error: "Mind map not found",
+        });
+      }
+
+      const userId = req.user.uid;
+      if (mindMap.userId !== userId) {
+        return res.status(403).json({
+          success: false,
+          error: "Access denied",
+        });
+      }
+
+      res.json({
+        success: true,
+        mindMap: {
+          id: mindMap._id,
+          title: mindMap.title,
+          data: mindMap.data,
+          createdAt: mindMap.createdAt,
+          lastModified: mindMap.lastModified,
+        },
+      });
+    } catch (error) {
+      console.error("Error retrieving mind map:", error.message);
+      res.status(500).json({
         success: false,
-        error: "Invalid mind map ID format",
+        error: "Failed to retrieve mind map",
+        details: error.message,
       });
     }
-
-    const mindMap = await db.collection("mindmaps").findOne({
-      _id: new ObjectId(mindMapId),
-    });
-
-    if (!mindMap) {
-      return res.status(404).json({
-        success: false,
-        error: "Mind map not found",
-      });
-    }
-
-    const userId = req.user.uid;
-    if (mindMap.userId !== userId) {
-      return res.status(403).json({
-        success: false,
-        error: "Access denied",
-      });
-    }
-
-    res.json({
-      success: true,
-      mindMap: {
-        id: mindMap._id,
-        title: mindMap.title,
-        data: mindMap.data,
-        createdAt: mindMap.createdAt,
-        lastModified: mindMap.lastModified,
-      },
-    });
-  } catch (error) {
-    console.error("Error retrieving mind map:", error.message);
-    res.status(500).json({
-      success: false,
-      error: "Failed to retrieve mind map",
-      details: error.message,
-    });
   }
-});
+);
 
 // Endpoint to get all mind maps for a user
-app.get("/api/mindmap/list", verifyToken, checkDbConnection, async (req, res) => {
-  try {
-    const userId = req.user.uid;
+app.get(
+  "/api/mindmap/list",
+  verifyToken,
+  checkDbConnection,
+  async (req, res) => {
+    try {
+      const userId = req.user.uid;
 
-    const mindMaps = await db
-      .collection("mindmaps")
-      .find({ userId })
-      .sort({ lastModified: -1 })
-      .project({
-        title: 1,
-        createdAt: 1,
-        lastModified: 1,
-      })
-      .toArray();
+      const mindMaps = await db
+        .collection("mindmaps")
+        .find({ userId })
+        .sort({ lastModified: -1 })
+        .project({
+          title: 1,
+          createdAt: 1,
+          lastModified: 1,
+        })
+        .toArray();
 
-    res.json({
-      success: true,
-      mindMaps: mindMaps.map((map) => ({
-        id: map._id,
-        title: map.title,
-        createdAt: map.createdAt,
-        lastModified: map.lastModified,
-      })),
-    });
-  } catch (error) {
-    console.error("Error retrieving mind maps:", error.message);
-    res.status(500).json({
-      success: false,
-      error: "Failed to retrieve mind maps",
-      details: error.message,
-    });
+      res.json({
+        success: true,
+        mindMaps: mindMaps.map((map) => ({
+          id: map._id,
+          title: map.title,
+          createdAt: map.createdAt,
+          lastModified: map.lastModified,
+        })),
+      });
+    } catch (error) {
+      console.error("Error retrieving mind maps:", error.message);
+      res.status(500).json({
+        success: false,
+        error: "Failed to retrieve mind maps",
+        details: error.message,
+      });
+    }
   }
-});
+);
 
 // Endpoint to delete a mind map
-app.delete("/api/mindmap/:id", verifyToken, checkDbConnection, async (req, res) => {
-  try {
-    const mindMapId = req.params.id;
+app.delete(
+  "/api/mindmap/:id",
+  verifyToken,
+  checkDbConnection,
+  async (req, res) => {
+    try {
+      const mindMapId = req.params.id;
 
-    if (!ObjectId.isValid(mindMapId)) {
-      return res.status(400).json({
+      if (!ObjectId.isValid(mindMapId)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid mind map ID format",
+        });
+      }
+
+      const mindMap = await db.collection("mindmaps").findOne({
+        _id: new ObjectId(mindMapId),
+      });
+
+      if (!mindMap) {
+        return res.status(404).json({
+          success: false,
+          error: "Mind map not found",
+        });
+      }
+
+      const userId = req.user.uid;
+      if (mindMap.userId !== userId) {
+        return res.status(403).json({
+          success: false,
+          error: "Access denied",
+        });
+      }
+
+      await db.collection("mindmaps").deleteOne({
+        _id: new ObjectId(mindMapId),
+      });
+
+      res.json({
+        success: true,
+        message: "Mind map deleted successfully",
+      });
+    } catch (error) {
+      console.error("Error deleting mind map:", error.message);
+      res.status(500).json({
         success: false,
-        error: "Invalid mind map ID format",
+        error: "Failed to delete mind map",
+        details: error.message,
       });
     }
-
-    const mindMap = await db.collection("mindmaps").findOne({
-      _id: new ObjectId(mindMapId),
-    });
-
-    if (!mindMap) {
-      return res.status(404).json({
-        success: false,
-        error: "Mind map not found",
-      });
-    }
-
-    const userId = req.user.uid;
-    if (mindMap.userId !== userId) {
-      return res.status(403).json({
-        success: false,
-        error: "Access denied",
-      });
-    }
-
-    await db.collection("mindmaps").deleteOne({
-      _id: new ObjectId(mindMapId),
-    });
-
-    res.json({
-      success: true,
-      message: "Mind map deleted successfully",
-    });
-  } catch (error) {
-    console.error("Error deleting mind map:", error.message);
-    res.status(500).json({
-      success: false,
-      error: "Failed to delete mind map",
-      details: error.message,
-    });
   }
-});
+);
 
 // Endpoint to parse a document and create a mind map
-app.post("/api/mindmap/parse-document", verifyToken, upload.single("document"), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        error: "No document uploaded",
-      });
-    }
+app.post(
+  "/api/mindmap/parse-document",
+  verifyToken,
+  upload.single("document"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          error: "No document uploaded",
+        });
+      }
 
-    const { subjectName } = req.body;
-    if (!subjectName) {
-      return res.status(400).json({
-        success: false,
-        error: "Subject name is required",
-      });
-    }
+      const { subjectName } = req.body;
+      if (!subjectName) {
+        return res.status(400).json({
+          success: false,
+          error: "Subject name is required",
+        });
+      }
 
-    console.log("Parsing document of type:", req.file.mimetype);
-    let documentText = "";
+      console.log("Parsing document of type:", req.file.mimetype);
+      let documentText = "";
 
-    if (req.file.mimetype === "application/pdf") {
-      const pdfData = await pdfParse(req.file.buffer);
-      documentText = pdfData.text;
-    } else if (req.file.mimetype.includes("word")) {
-      const result = await mammoth.extractRawText({
-        buffer: req.file.buffer,
-      });
-      documentText = result.value;
-    } else if (req.file.mimetype.includes("image")) {
-      const img = await sharp(req.file.buffer).toBuffer();
-      const { data } = await tesseract.recognize(img, "eng");
-      documentText = data.text;
-    } else {
-      documentText = req.file.buffer.toString("utf8");
-    }
+      if (req.file.mimetype === "application/pdf") {
+        const pdfData = await pdfParse(req.file.buffer);
+        documentText = pdfData.text;
+      } else if (req.file.mimetype.includes("word")) {
+        const result = await mammoth.extractRawText({
+          buffer: req.file.buffer,
+        });
+        documentText = result.value;
+      } else if (req.file.mimetype.includes("image")) {
+        const img = await sharp(req.file.buffer).toBuffer();
+        const { data } = await tesseract.recognize(img, "eng");
+        documentText = data.text;
+      } else {
+        documentText = req.file.buffer.toString("utf8");
+      }
 
-    if (!documentText || documentText.length < 50) {
-      return res.status(400).json({
-        success: false,
-        error: "Could not extract sufficient text from the document",
-      });
-    }    console.log(`Extracted ${documentText.length} characters of text`);
-    const maxLength = 15000;
-    const trimmedText =
-      documentText.length > maxLength
-        ? documentText.slice(0, maxLength) + "... [Text truncated due to length]"
-        : documentText;
+      if (!documentText || documentText.length < 50) {
+        return res.status(400).json({
+          success: false,
+          error: "Could not extract sufficient text from the document",
+        });
+      }
+      console.log(`Extracted ${documentText.length} characters of text`);
+      const maxLength = 15000;
+      const trimmedText =
+        documentText.length > maxLength
+          ? documentText.slice(0, maxLength) +
+            "... [Text truncated due to length]"
+          : documentText;
 
-    const completion = await parsingOpenAI.chat.completions.create({
-      messages: [
-        {
-          role: "system",
-          content: `You are an elite educational document analysis specialist with unprecedented expertise in extracting comprehensive learning structures from any academic content. Your mission is to analyze documents and create detailed mind maps that capture every educational concept and relationship with perfect hierarchical organization.
+      const completion = await parsingOpenAI.chat.completions.create({
+        messages: [
+          {
+            role: "system",
+            content: `You are an elite educational document analysis specialist with unprecedented expertise in extracting comprehensive learning structures from any academic content. Your mission is to analyze documents and create detailed mind maps that capture every educational concept and relationship with perfect hierarchical organization.
 
 ENHANCED DOCUMENT ANALYSIS CAPABILITIES:
 1. INTELLIGENT STRUCTURE DETECTION: Automatically recognize document structure regardless of format (headers, sections, paragraphs, bullet points)
@@ -994,153 +1085,174 @@ CRITICAL SUCCESS CRITERIA:
 - NEVER use trailing commas or invalid characters in JSON
 
 Transform the complete document into a comprehensive learning mind map with perfect hierarchical organization.`,
-        },
-        {
-          role: "user",
-          content: `Analyze this complete document and create a comprehensive mind map for "${subjectName}" extracting ALL educational content:
+          },
+          {
+            role: "user",
+            content: `Analyze this complete document and create a comprehensive mind map for "${subjectName}" extracting ALL educational content:
 
 ${trimmedText}`,
-        },      ],      model: "gpt-3.5-turbo",
-      temperature: 0.1, // Lower temperature for more deterministic parsing
-      max_tokens: 3000,
-      top_p: 0.9,
-      response_format: { type: "json_object" },
-    });    console.log("OpenAI parsing response received");
-    let jsonResponseContent;
-    try {
-      const content = completion.choices[0]?.message?.content || "";
-      console.log("Raw response length:", content.length);
-      
+          },
+        ],
+        model: "gpt-3.5-turbo",
+        temperature: 0.1, // Lower temperature for more deterministic parsing
+        max_tokens: 3000,
+        top_p: 0.9,
+        response_format: { type: "json_object" },
+      });
+      console.log("OpenAI parsing response received");
+      let jsonResponseContent;
       try {
-        // Direct parsing since OpenAI with response_format: { type: "json_object" } returns valid JSON
-        jsonResponseContent = JSON.parse(content);
-        console.log("JSON parsed successfully on first attempt");
-      } catch (parseError) {
-        console.log("First parse attempt failed, checking for JSON code blocks");
-        
-        // Try to extract JSON from code blocks if present (fallback)
-        const jsonBlockMatch = content.match(/```json\n([\s\S]*?)\n```/);
-        if (jsonBlockMatch && jsonBlockMatch[1]) {
-          const jsonText = jsonBlockMatch[1];
-          try {
-            jsonResponseContent = JSON.parse(jsonText);
-            console.log("JSON parsed from code block");
-          } catch (innerError) {
-            console.log("JSON parsing from code block failed, trying to fix JSON");
-            const fixedJson = fixBrokenJSON(jsonText);
+        const content = completion.choices[0]?.message?.content || "";
+        console.log("Raw response length:", content.length);
+
+        try {
+          // Direct parsing since OpenAI with response_format: { type: "json_object" } returns valid JSON
+          jsonResponseContent = JSON.parse(content);
+          console.log("JSON parsed successfully on first attempt");
+        } catch (parseError) {
+          console.log(
+            "First parse attempt failed, checking for JSON code blocks"
+          );
+
+          // Try to extract JSON from code blocks if present (fallback)
+          const jsonBlockMatch = content.match(/```json\n([\s\S]*?)\n```/);
+          if (jsonBlockMatch && jsonBlockMatch[1]) {
+            const jsonText = jsonBlockMatch[1];
+            try {
+              jsonResponseContent = JSON.parse(jsonText);
+              console.log("JSON parsed from code block");
+            } catch (innerError) {
+              console.log(
+                "JSON parsing from code block failed, trying to fix JSON"
+              );
+              const fixedJson = fixBrokenJSON(jsonText);
+              jsonResponseContent = JSON.parse(fixedJson);
+              console.log("Fixed JSON parsed successfully");
+            }
+          } else {
+            console.log(
+              "No JSON code blocks found, trying to fix entire content"
+            );
+            const fixedJson = fixBrokenJSON(content);
             jsonResponseContent = JSON.parse(fixedJson);
             console.log("Fixed JSON parsed successfully");
           }
-        } else {
-          console.log("No JSON code blocks found, trying to fix entire content");
-          const fixedJson = fixBrokenJSON(content);
-          jsonResponseContent = JSON.parse(fixedJson);
-          console.log("Fixed JSON parsed successfully");
         }
+      } catch (error) {
+        console.error("JSON parsing failed:", error.message);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to parse document content",
+          details: error.message,
+        });
       }
+
+      const transformedData = transformGroqResponse(
+        jsonResponseContent,
+        subjectName
+      );
+      const userId = req.user.uid;
+
+      let mindMapId = null;
+      if (db) {
+        const result = await db.collection("mindmaps").insertOne({
+          userId: userId,
+          title: subjectName,
+          sourceType: "document",
+          sourceFileName: req.file.originalname,
+          data: transformedData,
+          createdAt: new Date(),
+          lastModified: new Date(),
+        });
+        mindMapId = result.insertedId;
+        console.log(
+          `Document-based mind map saved to database with ID: ${mindMapId}`
+        );
+      }
+
+      res.status(201).json({
+        success: true,
+        message: "Document parsed and mind map created successfully",
+        mindMapId: mindMapId,
+        data: transformedData,
+      });
     } catch (error) {
-      console.error("JSON parsing failed:", error.message);
-      return res.status(500).json({
+      console.error("Error parsing document:", error.message);
+      res.status(500).json({
         success: false,
-        error: "Failed to parse document content",
+        error: "Failed to parse document",
         details: error.message,
       });
     }
-
-    const transformedData = transformGroqResponse(jsonResponseContent, subjectName);
-    const userId = req.user.uid;
-
-    let mindMapId = null;
-    if (db) {
-      const result = await db.collection("mindmaps").insertOne({
-        userId: userId,
-        title: subjectName,
-        sourceType: "document",
-        sourceFileName: req.file.originalname,
-        data: transformedData,
-        createdAt: new Date(),
-        lastModified: new Date(),
-      });
-      mindMapId = result.insertedId;
-      console.log(`Document-based mind map saved to database with ID: ${mindMapId}`);
-    }
-
-    res.status(201).json({
-      success: true,
-      message: "Document parsed and mind map created successfully",
-      mindMapId: mindMapId,
-      data: transformedData,
-    });
-  } catch (error) {
-    console.error("Error parsing document:", error.message);
-    res.status(500).json({
-      success: false,
-      error: "Failed to parse document",
-      details: error.message,
-    });
   }
-});
+);
 
 // Mind Map Generation Endpoint
-app.post("/api/mindmap/generate", verifyToken, checkDbConnection, async (req, res) => {
-  try {
-    const { subjectName, syllabus } = req.body;
-    const userId = req.user.uid;
-    
-    // Constants for Gyan Points system
-    const POINTS_REQUIRED = 15; // Points required for mind map generation
-
-    if (!subjectName) {
-      return res.status(400).json({
-        success: false,
-        error: "Subject name is required",
-      });
-    }
-
-    if (!syllabus) {
-      return res.status(400).json({
-        success: false,
-        error: "Syllabus content is required",
-      });
-    }
-
-    // Check if user has enough Gyan Points
-    const user = await db.collection("users").findOne({ uid: userId });
-    
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: "User not found",
-      });
-    }
-    
-    // Initialize gyanPoints if not present
-    const currentPoints = user.gyanPoints || 0;
-    
-    if (currentPoints < POINTS_REQUIRED) {
-      return res.status(403).json({
-        success: false,
-        error: "Insufficient Gyan Points",
-        currentPoints: currentPoints,
-        requiredPoints: POINTS_REQUIRED,
-      });
-    }
-    
-    // Deduct points before generating the mind map
-    await db.collection("users").updateOne(
-      { uid: userId },
-      { $inc: { gyanPoints: -POINTS_REQUIRED } }
-    );
-
-    console.log(`Generating mind map for subject: ${subjectName}`);
-    console.log(`Syllabus length: ${syllabus.length} characters`);
-    console.log(`Deducted ${POINTS_REQUIRED} Gyan Points from user: ${userId}`);    let parsingCompletion;
+app.post(
+  "/api/mindmap/generate",
+  verifyToken,
+  checkDbConnection,
+  async (req, res) => {
     try {
-parsingCompletion = await parsingOpenAI.chat.completions.create({
-  messages: [
-    {
-      role: "system",
-      content: `You are a syllabus parsing AI that extracts educational content and creates structured JSON. Your task is to analyze the syllabus, identify topics and subtopics, and output valid JSON with the following objectives:
+      const { subjectName, syllabus } = req.body;
+      const userId = req.user.uid;
+
+      // Constants for Gyan Points system
+      const POINTS_REQUIRED = 15; // Points required for mind map generation
+
+      if (!subjectName) {
+        return res.status(400).json({
+          success: false,
+          error: "Subject name is required",
+        });
+      }
+
+      if (!syllabus) {
+        return res.status(400).json({
+          success: false,
+          error: "Syllabus content is required",
+        });
+      }
+
+      // Check if user has enough Gyan Points
+      const user = await db.collection("users").findOne({ uid: userId });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: "User not found",
+        });
+      }
+
+      // Initialize gyanPoints if not present
+      const currentPoints = user.gyanPoints || 0;
+
+      if (currentPoints < POINTS_REQUIRED) {
+        return res.status(403).json({
+          success: false,
+          error: "Insufficient Gyan Points",
+          currentPoints: currentPoints,
+          requiredPoints: POINTS_REQUIRED,
+        });
+      }
+
+      // Deduct points before generating the mind map
+      await db
+        .collection("users")
+        .updateOne({ uid: userId }, { $inc: { gyanPoints: -POINTS_REQUIRED } });
+
+      console.log(`Generating mind map for subject: ${subjectName}`);
+      console.log(`Syllabus length: ${syllabus.length} characters`);
+      console.log(
+        `Deducted ${POINTS_REQUIRED} Gyan Points from user: ${userId}`
+      );
+      let parsingCompletion;
+      try {
+        parsingCompletion = await parsingOpenAI.chat.completions.create({
+          messages: [
+            {
+              role: "system",
+              content: `You are a syllabus parsing AI that extracts educational content and creates structured JSON. Your task is to analyze the syllabus, identify topics and subtopics, and output valid JSON with the following objectives:
 
 1. Extract main topics and subtopics from the syllabus
 2. Organize content into a clear hierarchy
@@ -1419,10 +1531,10 @@ Topic List:
 - Do NOT include markdown, code blocks (\`\`\`json), or explanations.
 - Ensure all content is extracted and hierarchically organized.
 - If JSON parsing fails during validation, rebalance brackets and retry before outputting.`,
-    },
-    {
-      role: "user",
-      content: `TASK: Parse this syllabus into PERFECT JSON structure.
+            },
+            {
+              role: "user",
+              content: `TASK: Parse this syllabus into PERFECT JSON structure.
 SUBJECT: "${subjectName}"
 OUTPUT: Only valid JSON starting with { and ending with }
 NO CODE BLOCKS, NO EXPLANATIONS, NO MARKDOWN
@@ -1431,78 +1543,91 @@ SYLLABUS:
 ${syllabus}
 
 RESPOND WITH VALID JSON ONLY:`,
-    },  ],  model: "gpt-3.5-turbo",
-  temperature: 0.0, // Deterministic parsing
-  max_tokens: 1500, // Reduced token limit for faster response
-  top_p: 0.2, // More focused on likely tokens
-  presence_penalty: -0.5, // Favor repetition/consistency
-  response_format: { type: "json_object" }
-});
-    } catch (parsingError) {
-      console.error("Error from parsing API:", parsingError.message);
-      return res.status(500).json({
-        success: false,
-        error: "Failed to parse syllabus with AI agent",
-        details: parsingError.message,
-      });
-    }
+            },
+          ],
+          model: "gpt-3.5-turbo",
+          temperature: 0.0, // Deterministic parsing
+          max_tokens: 1500, // Reduced token limit for faster response
+          top_p: 0.2, // More focused on likely tokens
+          presence_penalty: -0.5, // Favor repetition/consistency
+          response_format: { type: "json_object" },
+        });
+      } catch (parsingError) {
+        console.error("Error from parsing API:", parsingError.message);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to parse syllabus with AI agent",
+          details: parsingError.message,
+        });
+      }
 
-    let parsedStructure;    try {
-      const content = parsingCompletion.choices[0]?.message?.content || "";
-      console.log("Raw parser response length:", content.length);
-
+      let parsedStructure;
       try {
-        // Direct parsing should work with OpenAI's response_format: { type: "json_object" }
-        parsedStructure = JSON.parse(content);
-        console.log("Parsed structure JSON parsed successfully on first attempt");
-      } catch (parseError) {
-        console.log("First parse attempt failed, checking for JSON code blocks");
-        
-        // Fallback to code block extraction if needed
-        const jsonBlockMatch = content.match(/```(?:json)?\n([\s\S]*?)\n```/);
-        if (jsonBlockMatch && jsonBlockMatch[1]) {
-          const jsonText = jsonBlockMatch[1];
-          try {
-            parsedStructure = JSON.parse(jsonText);
-            console.log("Parsed structure JSON parsed from code block");
-          } catch (innerError) {
-            console.log("JSON parsing from code block failed, trying to fix JSON");
-            const fixedJson = fixBrokenJSON(jsonText);
+        const content = parsingCompletion.choices[0]?.message?.content || "";
+        console.log("Raw parser response length:", content.length);
+
+        try {
+          // Direct parsing should work with OpenAI's response_format: { type: "json_object" }
+          parsedStructure = JSON.parse(content);
+          console.log(
+            "Parsed structure JSON parsed successfully on first attempt"
+          );
+        } catch (parseError) {
+          console.log(
+            "First parse attempt failed, checking for JSON code blocks"
+          );
+
+          // Fallback to code block extraction if needed
+          const jsonBlockMatch = content.match(/```(?:json)?\n([\s\S]*?)\n```/);
+          if (jsonBlockMatch && jsonBlockMatch[1]) {
+            const jsonText = jsonBlockMatch[1];
+            try {
+              parsedStructure = JSON.parse(jsonText);
+              console.log("Parsed structure JSON parsed from code block");
+            } catch (innerError) {
+              console.log(
+                "JSON parsing from code block failed, trying to fix JSON"
+              );
+              const fixedJson = fixBrokenJSON(jsonText);
+              parsedStructure = JSON.parse(fixedJson);
+              console.log("Fixed parsed structure JSON successfully");
+            }
+          } else {
+            console.log(
+              "No JSON code blocks found, trying to fix entire content"
+            );
+            const fixedJson = fixBrokenJSON(content);
             parsedStructure = JSON.parse(fixedJson);
             console.log("Fixed parsed structure JSON successfully");
           }
-        } else {
-          console.log("No JSON code blocks found, trying to fix entire content");
-          const fixedJson = fixBrokenJSON(content);
-          parsedStructure = JSON.parse(fixedJson);
-          console.log("Fixed parsed structure JSON successfully");
         }
+
+        if (!parsedStructure.parsed_structure) {
+          if (parsedStructure.main_subject || parsedStructure.units) {
+            parsedStructure = { parsed_structure: parsedStructure };
+          } else {
+            throw new Error(
+              "Invalid parsed structure format - missing expected keys"
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Syllabus parsing failed:", error.message);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to parse syllabus",
+          details: error.message,
+        });
       }
 
-      if (!parsedStructure.parsed_structure) {
-        if (parsedStructure.main_subject || parsedStructure.units) {
-          parsedStructure = { parsed_structure: parsedStructure };
-        } else {
-          throw new Error("Invalid parsed structure format - missing expected keys");
-        }
-      }
-    } catch (error) {
-      console.error("Syllabus parsing failed:", error.message);
-      return res.status(500).json({
-        success: false,
-        error: "Failed to parse syllabus",
-        details: error.message,
-      });
-    }
-
-    console.log("Generating mind map from parsed structure...");
-    let mindMapCompletion;
-    try {
-mindMapCompletion = await openai.chat.completions.create({
-  messages: [
-    {
-      role: "system",
-      content: `You are a mind map creation AI that transforms parsed syllabus structures into organized mind maps in JSON format. Convert the parsed structure into a mind map while keeping these objectives in mind:
+      console.log("Generating mind map from parsed structure...");
+      let mindMapCompletion;
+      try {
+        mindMapCompletion = await openai.chat.completions.create({
+          messages: [
+            {
+              role: "system",
+              content: `You are a mind map creation AI that transforms parsed syllabus structures into organized mind maps in JSON format. Convert the parsed structure into a mind map while keeping these objectives in mind:
 
 1. Transform the parsed structure into mind map JSON format
 2. Preserve the hierarchical structure
@@ -1755,60 +1880,6 @@ mindMapCompletion = await openai.chat.completions.create({
 
 ---
 
-### EXAMPLE INPUT 2: PARSED STRUCTURE (Data Structures)
-**Input Parsed Structure:**
-\`\`\`json
-{
-  "parsed_structure": {
-    "main_subject": {
-      "title": "Data Structures",
-      "description": "Study of fundamental data organization techniques for efficient computation"
-    },
-    "units": [
-      {
-        "title": "Introduction",
-        "description": "Overview of data structures and their classifications",
-        "subtopics": [
-          {
-            "title": "Overview",
-            "description": "Introduction to data structures and their importance",
-            "sub_subtopics": []
-          }
-        ]
-      }
-    ]
-  }
-}
-\`\`\`
-
-**Expected Output:**
-\`\`\`json
-{
-  "mind_map": {
-    "central_node": {
-      "title": "Data Structures",
-      "description": "Study of fundamental data organization techniques for efficient computation",
-      "content": "Explores data structures for efficient storage and computation, critical for algorithm design and software development."
-    },
-    "module_nodes": [
-      {
-        "title": "Introduction",
-        "content": "Introduces data structures and their role in optimizing computational tasks",
-        "subtopics": [
-          {
-            "title": "Overview",
-            "content": "Significance of data structures in programming and algorithm efficiency",
-            "sub_subtopics": []
-          }
-        ]
-      }
-    ]
-  }
-}
-\`\`\`
-
----
-
 ### CRITICAL SUCCESS CRITERIA
 - Transform 100% of parsed structure content into mind map format.
 - Preserve exact hierarchical relationships and infinite nesting depth.
@@ -1823,125 +1894,146 @@ mindMapCompletion = await openai.chat.completions.create({
 - Respond with valid JSON only, starting with \`{\` and ending with \`}\`.
 - Do NOT include markdown, code blocks (\`\`\`json), or explanations.
 - Ensure all content is transformed and hierarchically organized.
-- If JSON parsing fails during validation, rebalance brackets and retry.`,
-    },
-    {
-      role: "user",
-      content: `Please transform this parsed syllabus structure into a perfect mind map:
+- If JSON parsing fails during validation, rebalance brackets and retry before output.`,
+            },
+            {
+              role: "user",
+              content: `Please transform this parsed syllabus structure into a perfect mind map:
 
 ${JSON.stringify(parsedStructure)}
 
 RESPOND WITH VALID MIND MAP JSON ONLY:`,
-    },  ],  model: "gpt-3.5-turbo",
-  temperature: 0.0, // Deterministic results
-  max_tokens: 1500, // Further reduced for faster response
-  top_p: 0.2, // More focused on likely tokens
-  presence_penalty: -0.5, // Favor repetition/consistency
-  response_format: { type: "json_object" }
-});
-    } catch (mindMapError) {
-      console.error("Error from mind map creation API:", mindMapError.message);
-      return res.status(500).json({
-        success: false,
-        error: "Failed to create mind map from parsed structure",
-        details: mindMapError.message,
-      });
-    }
+            },
+          ],
+          model: "gpt-3.5-turbo",
+          temperature: 0.0, // Deterministic results
+          max_tokens: 1500, // Further reduced for faster response
+          top_p: 0.2, // More focused on likely tokens
+          presence_penalty: -0.5, // Favor repetition/consistency
+          response_format: { type: "json_object" },
+        });
+      } catch (mindMapError) {
+        console.error(
+          "Error from mind map creation API:",
+          mindMapError.message
+        );
+        return res.status(500).json({
+          success: false,
+          error: "Failed to create mind map from parsed structure",
+          details: mindMapError.message,
+        });
+      }
 
-    let mindMapData;    try {
-      const content = mindMapCompletion.choices[0]?.message?.content || "";
-      console.log("Raw mind map response length:", content.length);
-
+      let mindMapData;
       try {
-        // Direct parsing should work with OpenAI's response_format: { type: "json_object" }
-        mindMapData = JSON.parse(content);
-        console.log("Mind map JSON parsed successfully on first attempt");
-      } catch (parseError) {
-        console.log("First parse attempt failed, checking for JSON code blocks");
-        
-        // Fallback to code block extraction if needed
-        const jsonBlockMatch = content.match(/```(?:json)?\n([\s\S]*?)\n```/);
-        if (jsonBlockMatch && jsonBlockMatch[1]) {
-          const jsonText = jsonBlockMatch[1];
-          try {
-            mindMapData = JSON.parse(jsonText);
-            console.log("Mind map JSON parsed from code block");
-          } catch (innerError) {
-            console.log("JSON parsing from code block failed, trying to fix JSON");
-            const fixedJson = fixBrokenJSON(jsonText);
+        const content = mindMapCompletion.choices[0]?.message?.content || "";
+        console.log("Raw mind map response length:", content.length);
+
+        try {
+          // Direct parsing should work with OpenAI's response_format: { type: "json_object" }
+          mindMapData = JSON.parse(content);
+          console.log("Mind map JSON parsed successfully on first attempt");
+        } catch (parseError) {
+          console.log(
+            "First parse attempt failed, checking for JSON code blocks"
+          );
+
+          // Fallback to code block extraction if needed
+          const jsonBlockMatch = content.match(/```(?:json)?\n([\s\S]*?)\n```/);
+          if (jsonBlockMatch && jsonBlockMatch[1]) {
+            const jsonText = jsonBlockMatch[1];
+            try {
+              mindMapData = JSON.parse(jsonText);
+              console.log("Mind map JSON parsed from code block");
+            } catch (innerError) {
+              console.log(
+                "JSON parsing from code block failed, trying to fix JSON"
+              );
+              const fixedJson = fixBrokenJSON(jsonText);
+              mindMapData = JSON.parse(fixedJson);
+              console.log("Fixed mind map JSON successfully");
+            }
+          } else {
+            console.log(
+              "No JSON code blocks found, trying to fix entire content"
+            );
+            const fixedJson = fixBrokenJSON(content);
             mindMapData = JSON.parse(fixedJson);
             console.log("Fixed mind map JSON successfully");
           }
-        } else {
-          console.log("No JSON code blocks found, trying to fix entire content");
-          const fixedJson = fixBrokenJSON(content);
-          mindMapData = JSON.parse(fixedJson);
-          console.log("Fixed mind map JSON successfully");
         }
+
+        if (!mindMapData.mind_map) {
+          throw new Error("Invalid mind map format - missing 'mind_map' key");
+        }
+        if (!mindMapData.mind_map.central_node) {
+          throw new Error("Invalid mind map format - missing 'central_node'");
+        }
+        if (!Array.isArray(mindMapData.mind_map.module_nodes)) {
+          throw new Error(
+            "Invalid mind map format - 'module_nodes' is not an array"
+          );
+        }
+      } catch (error) {
+        console.error("Mind map creation failed:", error.message);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to create mind map",
+          details: error.message,
+        });
       }
 
-      if (!mindMapData.mind_map) {
-        throw new Error("Invalid mind map format - missing 'mind_map' key");
+      let transformedData;
+      try {
+        transformedData = transformGroqResponse(mindMapData, subjectName);
+      } catch (transformError) {
+        console.error(
+          "Error transforming mind map data:",
+          transformError.message
+        );
+        return res.status(500).json({
+          success: false,
+          error: "Failed to transform mind map data",
+          details: transformError.message,
+        });
       }
-      if (!mindMapData.mind_map.central_node) {
-        throw new Error("Invalid mind map format - missing 'central_node'");
+
+      // userId is already declared at the top of this function
+      let result;
+      try {
+        if (db) {
+          result = await db.collection("mindmaps").insertOne({
+            userId: userId,
+            title: subjectName,
+            data: transformedData,
+            createdAt: new Date(),
+            lastModified: new Date(),
+            syllabus: syllabus,
+          });
+          console.log(
+            `Mind map saved to database with ID: ${result.insertedId}`
+          );
+        }
+      } catch (dbError) {
+        console.error("Error saving mind map to database:", dbError.message);
       }
-      if (!Array.isArray(mindMapData.mind_map.module_nodes)) {
-        throw new Error("Invalid mind map format - 'module_nodes' is not an array");
-      }
+
+      res.status(201).json({
+        success: true,
+        message: "Mind map created successfully",
+        mindMapId: result?.insertedId || null,
+        mindMap: transformedData,
+      });
     } catch (error) {
-      console.error("Mind map creation failed:", error.message);
-      return res.status(500).json({
+      console.error("Error generating mind map from syllabus:", error.message);
+      res.status(500).json({
         success: false,
-        error: "Failed to create mind map",
+        error: "Failed to generate mind map from syllabus",
         details: error.message,
       });
     }
-
-    let transformedData;
-    try {
-      transformedData = transformGroqResponse(mindMapData, subjectName);    } catch (transformError) {
-      console.error("Error transforming mind map data:", transformError.message);
-      return res.status(500).json({
-        success: false,
-        error: "Failed to transform mind map data",
-        details: transformError.message,
-      });
-    }
-
-    // userId is already declared at the top of this function
-    let result;
-    try {
-      if (db) {
-        result = await db.collection("mindmaps").insertOne({
-          userId: userId,
-          title: subjectName,
-          data: transformedData,
-          createdAt: new Date(),
-          lastModified: new Date(),
-          syllabus: syllabus,
-        });
-        console.log(`Mind map saved to database with ID: ${result.insertedId}`);
-      }
-    } catch (dbError) {
-      console.error("Error saving mind map to database:", dbError.message);
-    }
-
-    res.status(201).json({
-      success: true,
-      message: "Mind map created successfully",
-      mindMapId: result?.insertedId || null,
-      mindMap: transformedData,
-    });
-  } catch (error) {
-    console.error("Error generating mind map from syllabus:", error.message);
-    res.status(500).json({
-      success: false,
-      error: "Failed to generate mind map from syllabus",
-      details: error.message,
-    });
   }
-});
+);
 
 // Endpoint for health check
 app.get("/health", (req, res) => {
@@ -1965,36 +2057,42 @@ app.post("/api/mindmap/node-description", verifyToken, async (req, res) => {
       });
     }
 
-    console.log(`Generating enhanced description for node: ${nodeLabel} (${nodeId})`);    // Start all searches in parallel for better performance
+    console.log(
+      `Generating enhanced description for node: ${nodeLabel} (${nodeId})`
+    ); // Start all searches in parallel for better performance
     const [searchResults, images, videos] = await Promise.allSettled([
       // Search for relevant web content
-      tavilyClient.search(`${nodeLabel} explanation tutorial examples educational`, {
-        search_depth: "basic",
-        max_results: 5,
-        include_answer: true,
-        include_raw_content: false,
-        include_images: false
-      }).catch(err => {
-        console.error("Tavily search error:", err);
-        return { results: [] };
-      }),
-      
+      tavilyClient
+        .search(`${nodeLabel} explanation tutorial examples educational`, {
+          search_depth: "basic",
+          max_results: 5,
+          include_answer: true,
+          include_raw_content: false,
+          include_images: false,
+        })
+        .catch((err) => {
+          console.error("Tavily search error:", err);
+          return { results: [] };
+        }),
+
       // Search for relevant images
-      searchImages(nodeLabel).catch(err => {
+      searchImages(nodeLabel).catch((err) => {
         console.error("Image search error:", err);
         return [];
       }),
-      
+
       // Search for educational videos
-      searchEducationalVideos(nodeLabel).catch(err => {
+      searchEducationalVideos(nodeLabel).catch((err) => {
         console.error("Video search error:", err);
         return [];
-      })
-    ]);    // Extract results from settled promises
-    const webResults = searchResults.status === 'fulfilled' ? 
-      (searchResults.value?.results || []) : [];
-    const imageResults = images.status === 'fulfilled' ? images.value : [];
-    const videoResults = videos.status === 'fulfilled' ? videos.value : [];
+      }),
+    ]); // Extract results from settled promises
+    const webResults =
+      searchResults.status === "fulfilled"
+        ? searchResults.value?.results || []
+        : [];
+    const imageResults = images.status === "fulfilled" ? images.value : [];
+    const videoResults = videos.status === "fulfilled" ? videos.value : [];
 
     // Initialize Groq client with API key from environment variables
     const groq = new Groq({
@@ -2004,17 +2102,32 @@ app.post("/api/mindmap/node-description", verifyToken, async (req, res) => {
     let nodeDescription;
     try {
       // Formulate context based on syllabus and node hierarchy
-      const nodeContext = syllabus || ""; 
-      const parentContext = parentNodes ? 
-        `This topic is part of: ${parentNodes.map(n => n.label).join(" > ")}` : 
-        "";
-      const childContext = childNodes && childNodes.length > 0 ? 
-        `This topic includes subtopics: ${childNodes.map(n => n.label).join(", ")}` : 
-        "";      // Prepare web search context
-      const webContext = webResults.length > 0 ? 
-        `\n\nAdditional web resources found:\n${webResults.slice(0, 3).map(result => 
-          `- ${result.title}: ${result.content?.substring(0, 150) || result.raw_content?.substring(0, 150) || 'No description available'}...`
-        ).join('\n')}` : '';
+      const nodeContext = syllabus || "";
+      const parentContext = parentNodes
+        ? `This topic is part of: ${parentNodes
+            .map((n) => n.label)
+            .join(" > ")}`
+        : "";
+      const childContext =
+        childNodes && childNodes.length > 0
+          ? `This topic includes subtopics: ${childNodes
+              .map((n) => n.label)
+              .join(", ")}`
+          : ""; // Prepare web search context
+      const webContext =
+        webResults.length > 0
+          ? `\n\nAdditional web resources found:\n${webResults
+              .slice(0, 3)
+              .map(
+                (result) =>
+                  `- ${result.title}: ${
+                    result.content?.substring(0, 150) ||
+                    result.raw_content?.substring(0, 150) ||
+                    "No description available"
+                  }...`
+              )
+              .join("\n")}`
+          : "";
 
       // Create the prompt for the AI
       nodeDescription = await groq.chat.completions.create({
@@ -2047,7 +2160,7 @@ Formatting requirements:
 
 At the end, include a "## 📚 Further Learning" section that mentions the availability of visual resources and educational videos for deeper understanding.
 
-Your explanation should be authoritative, academically accurate, and designed to enhance understanding of the topic in its educational context.`
+Your explanation should be authoritative, academically accurate, and designed to enhance understanding of the topic in its educational context.`,
           },
           {
             role: "user",
@@ -2061,12 +2174,12 @@ ${childContext}
 ${webContext}
 
 Please provide a 350-450 word detailed description with proper formatting, including any necessary equations (using KaTeX/LaTeX syntax), code examples, or visual descriptions as appropriate for this specific topic.`,
-          }
+          },
         ],
         model: "llama-3.3-70b-versatile",
         temperature: 0.2,
         max_tokens: 1200,
-        top_p: 0.9
+        top_p: 0.9,
       });
     } catch (descriptionError) {
       console.error("Error from Groq API:", descriptionError.message);
@@ -2078,41 +2191,50 @@ Please provide a 350-450 word detailed description with proper formatting, inclu
     }
 
     // Extract the content from the response
-    const descriptionContent = nodeDescription.choices[0]?.message?.content || "";
+    const descriptionContent =
+      nodeDescription.choices[0]?.message?.content || "";
 
     // Prepare multimedia content for response
     const multimedia = {
-      images: imageResults.slice(0, 3).map(img => ({
+      images: imageResults.slice(0, 3).map((img) => ({
         url: img.url,
         title: img.title || `${nodeLabel} illustration`,
         source: img.source,
-        thumbnail: img.thumbnail
+        thumbnail: img.thumbnail,
       })),
-      videos: videoResults.slice(0, 2).map(video => ({
+      videos: videoResults.slice(0, 2).map((video) => ({
         videoId: video.videoId,
         title: video.title,
-        description: video.description?.substring(0, 150) + (video.description?.length > 150 ? '...' : ''),
+        description:
+          video.description?.substring(0, 150) +
+          (video.description?.length > 150 ? "..." : ""),
         thumbnail: video.thumbnail,
         embedUrl: video.embedUrl,
         channelTitle: video.channelTitle,
-        publishedAt: video.publishedAt
-      })),      references: webResults.slice(0, 5).map(result => ({
+        publishedAt: video.publishedAt,
+      })),
+      references: webResults.slice(0, 5).map((result) => ({
         title: result.title,
         url: result.url,
-        snippet: (result.content || result.raw_content || '')?.substring(0, 200) + ((result.content || result.raw_content || '').length > 200 ? '...' : ''),
-        score: result.score || 0
-      }))
+        snippet:
+          (result.content || result.raw_content || "")?.substring(0, 200) +
+          ((result.content || result.raw_content || "").length > 200
+            ? "..."
+            : ""),
+        score: result.score || 0,
+      })),
     };
 
-    console.log(`Enhanced description generated with ${multimedia.images.length} images, ${multimedia.videos.length} videos, and ${multimedia.references.length} references`);
-    
+    console.log(
+      `Enhanced description generated with ${multimedia.images.length} images, ${multimedia.videos.length} videos, and ${multimedia.references.length} references`
+    );
+
     // Return the enhanced description with multimedia content
     return res.json({
       success: true,
       description: descriptionContent,
-      multimedia: multimedia
+      multimedia: multimedia,
     });
-
   } catch (error) {
     console.error("Error generating enhanced node description:", error);
     return res.status(500).json({
@@ -2141,10 +2263,16 @@ app.post("/api/mindmap/generate-podcast", verifyToken, async (req, res) => {
     await elevenLabsService.initialize();
 
     // Generate podcast script using Gemini
-    const podcastScript = await elevenLabsService.generatePodcastScript(topic, description);
-    
+    const podcastScript = await elevenLabsService.generatePodcastScript(
+      topic,
+      description
+    );
+
     // Convert script to audio using ElevenLabs
-    const result = await elevenLabsService.convertScriptToAudio(podcastScript, nodeId);
+    const result = await elevenLabsService.convertScriptToAudio(
+      podcastScript,
+      nodeId
+    );
 
     if (!result || !result.audioUrl) {
       throw new Error("Failed to generate podcast audio");
@@ -2154,9 +2282,8 @@ app.post("/api/mindmap/generate-podcast", verifyToken, async (req, res) => {
     return res.json({
       success: true,
       podcastUrl: result.audioUrl,
-      script: result.script
+      script: result.script,
     });
-
   } catch (error) {
     console.error("Error generating podcast:", error);
     return res.status(500).json({
@@ -2168,124 +2295,132 @@ app.post("/api/mindmap/generate-podcast", verifyToken, async (req, res) => {
 });
 
 // Mind Map Node Read Status Endpoints
-app.put("/api/mindmap/:mindMapId/node/:nodeId/read-status", verifyToken, async (req, res) => {
-  try {
-    const { mindMapId, nodeId } = req.params;
-    const { isRead } = req.body;
-    const userId = req.user.uid;
+app.put(
+  "/api/mindmap/:mindMapId/node/:nodeId/read-status",
+  verifyToken,
+  async (req, res) => {
+    try {
+      const { mindMapId, nodeId } = req.params;
+      const { isRead } = req.body;
+      const userId = req.user.uid;
 
-    if (!mindMapId || !nodeId) {
-      return res.status(400).json({
+      if (!mindMapId || !nodeId) {
+        return res.status(400).json({
+          success: false,
+          error: "Mind map ID and node ID are required",
+        });
+      }
+
+      if (typeof isRead !== "boolean") {
+        return res.status(400).json({
+          success: false,
+          error: "isRead must be a boolean value",
+        });
+      }
+
+      // Connect to database
+      const client = new MongoClient(process.env.MONGODB_URI);
+      await client.connect();
+      const db = client.db("adhyayan_ai");
+
+      // Find or create user progress document
+      const progressCollection = db.collection("user_progress");
+      const progressQuery = { userId, mindMapId };
+
+      let progressDoc = await progressCollection.findOne(progressQuery);
+
+      if (!progressDoc) {
+        // Create new progress document
+        progressDoc = {
+          userId,
+          mindMapId,
+          nodeReadStatus: {},
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+      }
+
+      // Update the read status for the specific node
+      progressDoc.nodeReadStatus = progressDoc.nodeReadStatus || {};
+      progressDoc.nodeReadStatus[nodeId] = isRead;
+      progressDoc.updatedAt = new Date();
+
+      // Upsert the document
+      await progressCollection.replaceOne(progressQuery, progressDoc, {
+        upsert: true,
+      });
+
+      await client.close();
+
+      console.log(
+        `Updated read status for node ${nodeId} in mind map ${mindMapId}: ${isRead}`
+      );
+
+      res.json({
+        success: true,
+        message: "Node read status updated successfully",
+        nodeId,
+        isRead,
+      });
+    } catch (error) {
+      console.error("Error updating node read status:", error);
+      res.status(500).json({
         success: false,
-        error: "Mind map ID and node ID are required"
+        error: "Failed to update node read status",
+        details: error.message,
       });
     }
-
-    if (typeof isRead !== 'boolean') {
-      return res.status(400).json({
-        success: false,
-        error: "isRead must be a boolean value"
-      });
-    }
-
-    // Connect to database
-    const client = new MongoClient(process.env.MONGODB_URI);
-    await client.connect();
-    const db = client.db("adhyayan_ai");
-
-    // Find or create user progress document
-    const progressCollection = db.collection("user_progress");
-    const progressQuery = { userId, mindMapId };
-
-    let progressDoc = await progressCollection.findOne(progressQuery);
-
-    if (!progressDoc) {
-      // Create new progress document
-      progressDoc = {
-        userId,
-        mindMapId,
-        nodeReadStatus: {},
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-    }
-
-    // Update the read status for the specific node
-    progressDoc.nodeReadStatus = progressDoc.nodeReadStatus || {};
-    progressDoc.nodeReadStatus[nodeId] = isRead;
-    progressDoc.updatedAt = new Date();
-
-    // Upsert the document
-    await progressCollection.replaceOne(
-      progressQuery,
-      progressDoc,
-      { upsert: true }
-    );
-
-    await client.close();
-
-    console.log(`Updated read status for node ${nodeId} in mind map ${mindMapId}: ${isRead}`);
-
-    res.json({
-      success: true,
-      message: "Node read status updated successfully",
-      nodeId,
-      isRead
-    });
-
-  } catch (error) {
-    console.error("Error updating node read status:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to update node read status",
-      details: error.message
-    });
   }
-});
+);
 
 // Get read status for all nodes in a mind map
-app.get("/api/mindmap/:mindMapId/read-status", verifyToken, async (req, res) => {
-  try {
-    const { mindMapId } = req.params;
-    const userId = req.user.uid;
+app.get(
+  "/api/mindmap/:mindMapId/read-status",
+  verifyToken,
+  async (req, res) => {
+    try {
+      const { mindMapId } = req.params;
+      const userId = req.user.uid;
 
-    if (!mindMapId) {
-      return res.status(400).json({
+      if (!mindMapId) {
+        return res.status(400).json({
+          success: false,
+          error: "Mind map ID is required",
+        });
+      }
+
+      // Connect to database
+      const client = new MongoClient(process.env.MONGODB_URI);
+      await client.connect();
+      const db = client.db("adhyayan_ai");
+
+      // Get user progress document
+      const progressCollection = db.collection("user_progress");
+      const progressDoc = await progressCollection.findOne({
+        userId,
+        mindMapId,
+      });
+
+      await client.close();
+
+      const nodeReadStatus = progressDoc
+        ? progressDoc.nodeReadStatus || {}
+        : {};
+
+      res.json({
+        success: true,
+        nodeReadStatus,
+      });
+    } catch (error) {
+      console.error("Error fetching node read status:", error);
+      res.status(500).json({
         success: false,
-        error: "Mind map ID is required"
+        error: "Failed to fetch node read status",
+        details: error.message,
       });
     }
-
-    // Connect to database
-    const client = new MongoClient(process.env.MONGODB_URI);
-    await client.connect();
-    const db = client.db("adhyayan_ai");
-
-    // Get user progress document
-    const progressCollection = db.collection("user_progress");
-    const progressDoc = await progressCollection.findOne({
-      userId,
-      mindMapId
-    });
-
-    await client.close();
-
-    const nodeReadStatus = progressDoc ? (progressDoc.nodeReadStatus || {}) : {};
-
-    res.json({
-      success: true,
-      nodeReadStatus
-    });
-
-  } catch (error) {
-    console.error("Error fetching node read status:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to fetch node read status",
-      details: error.message
-    });
   }
-});
+);
 
 // Mind Map Node Questions Generator Endpoint - Generates AI questions based on node content
 app.post("/api/mindmap/node-questions", verifyToken, async (req, res) => {
@@ -2314,7 +2449,8 @@ app.post("/api/mindmap/node-questions", verifyToken, async (req, res) => {
             contents: [
               {
                 parts: [
-                  {                    text: `You are an AI tutor that generates engaging questions about educational content that a student might have.
+                  {
+                    text: `You are an AI tutor that generates engaging questions about educational content that a student might have.
 
 Given the following educational content about "${nodeId}", generate exactly 5 relevant questions that a student might ask after reading this content.
 
@@ -2333,40 +2469,46 @@ IMPORTANT: Return ONLY a valid JSON array with exactly 5 question strings. Do no
 Example of the exact format required:
 ["What is the main purpose of this process?", "How does this relate to other concepts?", "What factors influence this mechanism?", "Can you provide a real-world example?", "What would happen if this process failed?"]
 
-Your response must be a valid JSON array that can be parsed directly:`
-                  }
-                ]
-              }
+Your response must be a valid JSON array that can be parsed directly:`,
+                  },
+                ],
+              },
             ],
             generationConfig: {
               temperature: 0.1,
               maxOutputTokens: 500,
               topP: 0.8,
-              topK: 10
-            }
+              topK: 10,
+            },
           }),
         }
       );
 
-      const data = await response.json();      // Extract the generated content from Gemini response
-      let questionText = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
-      
+      const data = await response.json(); // Extract the generated content from Gemini response
+      let questionText =
+        data.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+
       // Clean up the response - remove markdown code blocks if present
-      questionText = questionText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-      
+      questionText = questionText
+        .replace(/```json\s*/g, "")
+        .replace(/```\s*/g, "")
+        .trim();
+
       // Parse the JSON array of questions or return default questions if parsing fails
       let questions;
       try {
         questions = JSON.parse(questionText);
-        
+
         // Validate that we got an array of strings
         if (!Array.isArray(questions) || questions.length === 0) {
           throw new Error("Invalid response format - not an array");
         }
-        
+
         // Ensure we have exactly 5 questions and they are all strings
-        questions = questions.filter(q => typeof q === 'string' && q.trim().length > 0).slice(0, 5);
-        
+        questions = questions
+          .filter((q) => typeof q === "string" && q.trim().length > 0)
+          .slice(0, 5);
+
         if (questions.length < 5) {
           // Fill with default questions if we don't have enough
           const defaultQuestions = [
@@ -2374,13 +2516,14 @@ Your response must be a valid JSON array that can be parsed directly:`
             "What are the key concepts here?",
             "How does this relate to other topics?",
             "Can you explain this in simple terms?",
-            "What should I focus on learning?"
+            "What should I focus on learning?",
           ];
           while (questions.length < 5) {
-            questions.push(defaultQuestions[questions.length] || "What else should I know?");
+            questions.push(
+              defaultQuestions[questions.length] || "What else should I know?"
+            );
           }
         }
-        
       } catch (parseError) {
         console.error("Failed to parse questions response:", parseError);
         console.log("Raw response text:", questionText);
@@ -2389,18 +2532,17 @@ Your response must be a valid JSON array that can be parsed directly:`
           "What are the key concepts here?",
           "How does this relate to other topics?",
           "Can you explain this in simple terms?",
-          "What should I focus on learning?"
+          "What should I focus on learning?",
         ];
       }
 
       return res.json({
         success: true,
-        questions
+        questions,
       });
-
     } catch (apiError) {
       console.error("Error calling Gemini API:", apiError);
-      
+
       // Return default questions on API error
       return res.json({
         success: true,
@@ -2409,8 +2551,8 @@ Your response must be a valid JSON array that can be parsed directly:`
           "What are the key concepts here?",
           "How does this relate to other topics?",
           "Can you explain this in simple terms?",
-          "What should I focus on learning?"
-        ]
+          "What should I focus on learning?",
+        ],
       });
     }
   } catch (error) {
@@ -2435,7 +2577,12 @@ app.post("/api/mindmap/chat-response", verifyToken, async (req, res) => {
       });
     }
 
-    console.log(`Generating chat response for node ${nodeId} and message: ${userMessage.substring(0, 50)}...`);
+    console.log(
+      `Generating chat response for node ${nodeId} and message: ${userMessage.substring(
+        0,
+        50
+      )}...`
+    );
 
     try {
       // Use the dedicated Gemini API key for responses
@@ -2468,16 +2615,16 @@ Provide a clear, informative, and educational response to the user's question. Y
 7. Stay focused on the topic at hand and directly address the user's question
 8. Provide specific examples or applications if relevant
 
-Your tone should be that of a knowledgeable and engaging tutor who's passionate about helping students understand the material.`
-                  }
-                ]
-              }
+Your tone should be that of a knowledgeable and engaging tutor who's passionate about helping students understand the material.`,
+                  },
+                ],
+              },
             ],
             generationConfig: {
               temperature: 0.2,
               maxOutputTokens: 1024,
-              topP: 0.9
-            }
+              topP: 0.9,
+            },
           }),
         }
       );
@@ -2485,24 +2632,25 @@ Your tone should be that of a knowledgeable and engaging tutor who's passionate 
       const data = await response.json();
 
       // Extract the generated content from Gemini response
-      const responseContent = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      
+      const responseContent =
+        data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
       if (!responseContent) {
         throw new Error("Empty response from Gemini API");
       }
 
       return res.json({
         success: true,
-        response: responseContent
+        response: responseContent,
       });
-
     } catch (apiError) {
       console.error("Error calling Gemini API for chat response:", apiError);
-      
+
       // Return default response on API error
       return res.json({
         success: true,
-        response: "I apologize, but I'm having trouble generating a response right now. Could you try asking your question in a different way, or ask about another aspect of this topic?"
+        response:
+          "I apologize, but I'm having trouble generating a response right now. Could you try asking your question in a different way, or ask about another aspect of this topic?",
       });
     }
   } catch (error) {
@@ -2518,7 +2666,8 @@ Your tone should be that of a knowledgeable and engaging tutor who's passionate 
 // Mind Map Node Expansion Endpoint - Generate sub-nodes for leaf nodes
 app.post("/api/mindmap/expand-node", verifyToken, async (req, res) => {
   try {
-    const { mindMapId, nodeId, nodeTitle, nodeDescription, currentLevel } = req.body;
+    const { mindMapId, nodeId, nodeTitle, nodeDescription, currentLevel } =
+      req.body;
 
     if (!mindMapId || !nodeId || !nodeTitle) {
       return res.status(400).json({
@@ -2528,164 +2677,403 @@ app.post("/api/mindmap/expand-node", verifyToken, async (req, res) => {
     }
 
     const userId = req.user.uid;
-    console.log(`Expanding node: ${nodeTitle} (${nodeId}) for user: ${userId}`);
+    console.log(`Expanding node: ${nodeTitle} (${nodeId}) for user: ${userId}`); // Get the mind map subject context first
+    let subjectContext = "General Academic Subject";
+    let parentSubject = "";
 
+    if (db && mindMapId) {
+      try {
+        let mindMap = null;
+
+        // Try to find mind map using different ID formats
+        if (ObjectId.isValid(mindMapId)) {
+          // Standard MongoDB ObjectId format
+          mindMap = await db.collection("mindmaps").findOne({
+            _id: new ObjectId(mindMapId),
+            userId: userId,
+          });
+        } else {
+          // Custom ID format - search by title or custom field
+          // First try to find by a custom mindMapId field
+          mindMap = await db.collection("mindmaps").findOne({
+            mindMapId: mindMapId,
+            userId: userId,
+          });
+
+          // If not found, try searching by other potential fields
+          if (!mindMap) {
+            mindMap = await db.collection("mindmaps").findOne({
+              customId: mindMapId,
+              userId: userId,
+            });
+          }
+        }
+
+        if (mindMap && mindMap.title) {
+          subjectContext = mindMap.title;
+          parentSubject = mindMap.title;
+          console.log(`Found subject context: ${subjectContext}`);
+        } else {
+          console.log(
+            `Mind map not found for ID: ${mindMapId}, will use intelligent context detection`
+          );
+        }
+      } catch (dbError) {
+        console.error("Error fetching mind map context:", dbError);
+        console.log("Will use intelligent context detection as fallback");
+      }
+    } else {
+      console.log(
+        "No database or mindMapId available, will use intelligent context detection"
+      );
+    }
     try {
-      // Use the dedicated Gemini API key for node expansion
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.QUERY_GEMINI_API_KEY}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `You are an educational AI that expands topics into detailed sub-concepts for deep learning. Generate 3-5 relevant sub-topics that would help students understand the given topic in greater depth.
+      // Use OpenAI with dedicated API key for node expansion
+      const expandOpenAI = new OpenAI({
+        apiKey: process.env.EXPAND_NODE_API_KEY,
+        maxRetries: 2,
+        httpAgent: {
+          keepAlive: true,
+        },
+      });
+      const completion = await expandOpenAI.chat.completions.create({
+        messages: [
+          {
+            role: "system",
+            content: `You are an exceptionally advanced educational AI with world-class expertise across all academic disciplines. You possess the cognitive abilities of the most distinguished scholars, with deep interdisciplinary knowledge and the ability to perform sophisticated contextual analysis. Your mission is to expand educational topics with unprecedented intelligence and domain awareness.
 
-Topic to expand: "${nodeTitle}"
-${nodeDescription ? `Context: ${nodeDescription}` : ''}
-Current level: ${currentLevel || 'unknown'}
+🧠 **ULTRA-ADVANCED COGNITIVE ARCHITECTURE**:
 
-Generate educational sub-topics that:
-1. Break down the main topic into logical components
-2. Cover different aspects or perspectives of the topic
-3. Are appropriate for deep learning and understanding
-4. Include both theoretical and practical elements where applicable
-5. Are structured for progressive learning
+**PHASE 1: MULTI-DIMENSIONAL CONTEXTUAL INTELLIGENCE**
 
-IMPORTANT: Return ONLY a valid JSON object with this exact structure. Do not include any markdown formatting, code blocks, or explanations.
+Before generating any sub-topics, perform sophisticated multi-layered analysis:
 
+1. **Advanced Lexical-Semantic Analysis**: Examine "${nodeTitle}" with expert precision:
+   - **Technical Terminology Patterns**: Identify field-specific vocabulary signatures
+     • "class", "object", "inheritance" → Object-Oriented Programming (Computer Science)
+     • "gene", "allele", "inheritance" → Genetics (Life Sciences)
+     • "estate", "will", "inheritance" → Property Law (Legal Studies)
+     • "culture", "tradition", "inheritance" → Cultural Transmission (Anthropology)
+   - **Domain-Specific Syntax**: Recognize naming conventions and structural patterns
+   - **Conceptual Relationship Indicators**: Map semantic networks and knowledge hierarchies
+   - **Academic Field Fingerprints**: Detect unique linguistic markers per discipline
+
+2. **Enhanced Contextual Intelligence Matrix**: Analyze ALL available context signals:
+   - **Primary Subject Framework**: "${subjectContext}"
+   - **Target Concept**: "${nodeTitle}"
+   ${nodeDescription ? `- **Semantic Context**: "${nodeDescription}"` : ""}
+   - **Hierarchical Level**: ${currentLevel || "unknown"}
+   - **Cross-Reference Analysis**: Compare against 50+ academic domain vocabularies
+
+3. **Probabilistic Domain Assessment**: Calculate precision likelihood scores:
+   - **Computer Science/Software Engineering** (algorithms, data structures, programming paradigms)
+   - **Life Sciences & Biotechnology** (biology, genetics, ecology, biochemistry, molecular biology)
+   - **Physical Sciences & Engineering** (physics, chemistry, materials science, mechanical systems)
+   - **Mathematics & Statistics** (algebra, calculus, discrete math, probability, data science)
+   - **Business & Management** (strategy, finance, operations, marketing, organizational behavior)
+   - **Social Sciences & Psychology** (sociology, psychology, anthropology, economics, political science)
+   - **Law & Governance** (constitutional law, policy, legal systems, international relations)
+   - **Arts & Humanities** (literature, philosophy, history, linguistics, cultural studies)
+   - **Medicine & Health Sciences** (anatomy, pathology, pharmacology, public health, clinical practice)
+   - **Applied Sciences** (engineering, technology, industrial applications, innovation)
+
+4. **Advanced Disambiguation Protocols**: For highly ambiguous polysemous terms:
+
+   **"Inheritance" - Sophisticated Context Resolution**:
+   - **Object-Oriented Programming** (95% if CS context): Class hierarchies, polymorphism, method overriding, single/multiple inheritance, interface implementation
+   - **Genetics & Biology** (90% if life science context): Mendelian inheritance, genetic transmission, chromosomal patterns, hereditary traits, epigenetic factors
+   - **Legal & Estate Law** (85% if legal context): Succession planning, property transfer, inheritance tax, probate law, estate administration
+   - **Cultural Anthropology** (80% if social context): Cultural transmission, intergenerational knowledge transfer, traditional practices, social heritage
+
+   **"Relationships" - Multi-Domain Analysis**:
+   - **Database Systems** (95% if data context): Foreign keys, entity relationships, normalization, referential integrity, data modeling
+   - **Psychology & Sociology** (90% if human context): Interpersonal dynamics, attachment theory, social bonds, relationship psychology
+   - **Mathematics** (85% if formal context): Function mappings, relational algebra, set theory, mathematical relationships
+   - **Business & Organizations** (80% if commercial context): Stakeholder relationships, partnership structures, customer relations
+
+   **"Networks" - Domain Disambiguation**:
+   - **Computer Science & IT** (95% if tech context): Graph theory, network protocols, distributed systems, connectivity algorithms, cybersecurity
+   - **Social Sciences** (90% if human context): Social network analysis, community structures, relationship mapping, influence networks
+   - **Neuroscience & Biology** (85% if brain context): Neural networks, synaptic connectivity, brain circuitry, neural pathways
+   - **Business & Economics** (80% if commercial context): Supply chain networks, professional networks, market relationships
+
+**PHASE 2: EXPERT-LEVEL DOMAIN-SPECIFIC INTELLIGENCE**
+
+Once domain is identified with >90% confidence, apply Nobel-laureate level expertise:
+
+🖥️ **COMPUTER SCIENCE/PROGRAMMING**:
+- **Theoretical Foundations**: Computational complexity, algorithm analysis, formal methods, type theory
+- **Programming Paradigms**: Object-oriented design, functional programming, concurrent systems
+- **System Architecture**: Distributed systems, microservices, cloud computing, scalability patterns
+- **Advanced Technologies**: Machine learning, AI, blockchain, quantum computing, cybersecurity
+- **Software Engineering**: Design patterns, clean architecture, TDD, DevOps, CI/CD
+
+🧬 **LIFE SCIENCES**:
+- **Molecular Biology**: DNA replication, transcription, protein folding, enzyme kinetics, metabolic pathways
+- **Cellular Biology**: Cell cycle, organelle function, cellular signaling, stem cell biology
+- **Genetics**: Mendelian genetics, population genetics, epigenetics, CRISPR, gene therapy
+- **Physiology**: Organ systems, homeostasis, neural function, endocrine regulation
+- **Ecology**: Population dynamics, ecosystem interactions, conservation biology, evolution
+
+⚗️ **PHYSICAL SCIENCES**:
+- **Fundamental Physics**: Quantum mechanics, relativity, thermodynamics, electromagnetism
+- **Chemistry**: Organic synthesis, physical chemistry, analytical chemistry, biochemistry
+- **Materials Science**: Crystal structures, nanotechnology, polymer science, semiconductors
+- **Applied Physics**: Optics, fluid dynamics, plasma physics, condensed matter
+- **Engineering Applications**: Chemical engineering, environmental chemistry, green chemistry
+
+📊 **MATHEMATICS**:
+- Provide rigorous definitions and proofs where appropriate
+- Include both abstract theory and practical applications
+- Reference connections to other mathematical domains
+- Consider computational and algorithmic aspects
+
+🏗️ **ENGINEERING**:
+- Include design principles and engineering constraints
+- Consider safety, efficiency, and optimization factors
+- Reference industry standards and best practices
+- Include both theoretical and practical implementation aspects
+
+� **BUSINESS/MANAGEMENT**:
+- Apply strategic thinking and market considerations
+- Include financial, operational, and human factors
+- Reference contemporary business models and practices
+- Consider stakeholder perspectives and ethical implications
+
+🧠 **SOCIAL SCIENCES**:
+- Include psychological, sociological, and cultural dimensions
+- Reference empirical research and methodological approaches
+- Consider individual and group behavior patterns
+- Include cross-cultural and historical perspectives
+
+⚖️ **LAW AND GOVERNANCE**:
+- Apply legal principles and precedents
+- Include constitutional, statutory, and regulatory frameworks
+- Consider jurisdictional differences and international law
+- Reference case studies and legal scholarship
+
+🎨 **ARTS AND HUMANITIES**:
+- Include historical, cultural, and aesthetic perspectives
+- Reference critical theories and interpretive frameworks
+- Consider cross-cultural and interdisciplinary connections
+- Include both traditional and contemporary approaches
+
+🏥 **MEDICINE AND HEALTH**:
+- Apply evidence-based medical knowledge
+- Include anatomical, physiological, and pathological perspectives
+- Reference diagnostic and therapeutic approaches
+- Consider public health and clinical implications
+
+**PHASE 3: HIERARCHICAL STRUCTURE OPTIMIZATION**
+
+Design sub-topics with pedagogical intelligence:
+
+1. **Learning Progression**: Structure from foundational → intermediate → advanced
+2. **Conceptual Dependencies**: Ensure logical prerequisite relationships
+3. **Cognitive Load Management**: Balance depth with comprehensibility
+4. **Knowledge Integration**: Show connections between concepts
+5. **Application Bridges**: Link theory to real-world applications
+
+**PHASE 4: ULTRA-RIGOROUS ACADEMIC EXCELLENCE STANDARDS**
+
+Each sub-topic must meet the highest scholarly excellence criteria:
+
+- **Terminological Precision**: Use exact field-specific vocabulary with absolute accuracy
+- **Intellectual Depth**: Provide substantial content (150-250 words) with graduate-level sophistication
+- **Domain Relevance**: Ensure perfect alignment with identified academic field and parent concept
+- **Comprehensive Coverage**: Address all essential aspects with no conceptual gaps or redundancy
+- **Contemporary Innovation**: Include latest research developments and cutting-edge insights
+- **Pedagogical Clarity**: Maintain educational accessibility while preserving academic integrity
+- **Professional Relevance**: Connect to real-world applications and career pathways
+
+🎯 **ULTRA-ENHANCED OUTPUT SPECIFICATIONS**:
+
+Generate exactly 3-5 sub-topics demonstrating:
+- **PhD-Level Domain Mastery**: Research-level understanding of field-specific concepts
+- **Perfect Contextual Intelligence**: Flawless alignment with educational context and objectives
+- **Advanced Pedagogical Architecture**: Optimal learning progression and conceptual relationships
+- **Academic Sophistication**: Graduate school-level depth with contemporary research integration
+- **Professional Integration**: Real-world applications, industry relevance, and career preparation
+
+**PRECISION JSON OUTPUT FORMAT**:
 {
   "subNodes": [
     {
-      "title": "Sub-topic Title 1",
-      "description": "Comprehensive description explaining this sub-concept and its importance",
-      "hasChildren": true
-    },
-    {
-      "title": "Sub-topic Title 2", 
-      "description": "Detailed explanation of this aspect with educational context",
-      "hasChildren": true
-    },
-    {
-      "title": "Sub-topic Title 3",
-      "description": "In-depth description covering key points and applications",
+      "title": "Precisely Named Domain-Specific Sub-topic Using Expert Terminology",
+      "description": "Comprehensive academic description (150-250 words) using field-appropriate terminology with absolute precision, explaining theoretical foundations, practical applications, current research directions, methodological approaches, and connections to broader domain knowledge. Include specific examples, contemporary developments, interdisciplinary connections, and professional relevance while maintaining graduate-level academic rigor.",
       "hasChildren": true
     }
   ]
 }
 
-Generate exactly 3-5 sub-nodes that provide comprehensive coverage of the topic. Each description should be 50-150 words and educationally valuable.`
-                  }
-                ]
-              }
-            ],
-            generationConfig: {
-              temperature: 0.2,
-              maxOutputTokens: 1500,
-              topP: 0.8,
-              topK: 10
-            }
-          }),
-        }
-      );
+🚀 **ULTRA-PRECISION EXECUTION PROTOCOL**:
 
-      const data = await response.json();
-      
-      // Extract the generated content from Gemini response
-      let expansionText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{"subNodes": []}';
-      
+1. **ANALYZE**: Perform comprehensive multi-dimensional domain analysis using all cognitive frameworks
+2. **IDENTIFY**: Determine primary academic domain with >95% confidence using probabilistic modeling
+3. **STRUCTURE**: Design optimal learning hierarchy with advanced pedagogical intelligence
+4. **GENERATE**: Create sub-topics with Nobel-laureate level domain expertise and precision
+5. **VALIDATE**: Ensure perfect academic rigor, contemporary relevance, and educational excellence
+6. **OUTPUT**: Provide only flawless JSON without any formatting or explanations
+
+**ULTIMATE SUCCESS CRITERIA**:
+- 100% domain accuracy and terminological precision
+- PhD/Research-level academic depth and sophistication
+- Perfect pedagogical structure and learning progression optimization
+- Cutting-edge contemporary relevance and research integration
+- Flawless technical vocabulary and concept application
+- Maximum educational value and professional preparation
+
+Deploy your complete intellectual arsenal, channeling the combined expertise of the world's leading academics to create the most sophisticated, contextually intelligent, and educationally transformative expansion possible. Think with the precision of a Fields Medal mathematician, the insight of a Nobel Prize scientist, and the pedagogical excellence of the world's greatest educators.`,
+          },
+          {
+            role: "user",
+            content: `Apply your advanced cognitive framework to intelligently analyze and expand the topic "${nodeTitle}". 
+
+**CONTEXTUAL INTELLIGENCE INPUTS**:
+- Primary Context: ${subjectContext}
+- Topic Focus: ${nodeTitle}
+${nodeDescription ? `- Additional Context: ${nodeDescription}` : ""}
+- Hierarchical Level: ${currentLevel || "unknown"}
+
+**MISSION**: 
+Using your world-class expertise, perform sophisticated domain analysis, determine the most appropriate academic field, and generate 3-5 domain-specific sub-topics with graduate-level depth, precision, and pedagogical intelligence.
+
+**REQUIREMENTS**:
+- Demonstrate mastery of the identified academic domain
+- Use precise field-specific terminology and concepts
+- Provide comprehensive descriptions (100-200 words each)
+- Ensure perfect learning progression and conceptual relationships
+- Include contemporary insights and practical applications
+- Maintain academic rigor while ensuring educational accessibility
+
+Generate sub-topics that would be worthy of the most distinguished academic institutions and reflect the cutting edge of knowledge in the field.`,
+          },
+        ],
+        model: "gpt-4-turbo",
+        temperature: 0.02, // Ultra-low for maximum precision and domain consistency
+        max_tokens: 3000, // Increased for more comprehensive responses
+        top_p: 0.4, // More focused on highest probability tokens
+        presence_penalty: -0.5, // Strong favor for consistency in domain terminology
+        frequency_penalty: 0.2, // Higher penalty for repetition to ensure diverse coverage
+        response_format: { type: "json_object" },
+      });
+
+      // Extract the generated content from OpenAI response
+      let expansionText =
+        completion.choices[0]?.message?.content || '{"subNodes": []}';
+
       // Clean up the response - remove markdown code blocks if present
-      expansionText = expansionText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-      
+      expansionText = expansionText
+        .replace(/```json\s*/g, "")
+        .replace(/```\s*/g, "")
+        .trim();
+
       // Parse the JSON response
       let expansionResult;
       try {
         expansionResult = JSON.parse(expansionText);
-        
+
         // Validate the response structure
-        if (!expansionResult.subNodes || !Array.isArray(expansionResult.subNodes)) {
-          throw new Error("Invalid response format - subNodes not found or not an array");
+        if (
+          !expansionResult.subNodes ||
+          !Array.isArray(expansionResult.subNodes)
+        ) {
+          throw new Error(
+            "Invalid response format - subNodes not found or not an array"
+          );
         }
-        
+
         // Ensure we have valid sub-nodes
-        expansionResult.subNodes = expansionResult.subNodes.filter(node => 
-          node.title && node.description && 
-          typeof node.title === 'string' && 
-          typeof node.description === 'string'
+        expansionResult.subNodes = expansionResult.subNodes.filter(
+          (node) =>
+            node.title &&
+            node.description &&
+            typeof node.title === "string" &&
+            typeof node.description === "string"
         );
-        
+
         if (expansionResult.subNodes.length === 0) {
           throw new Error("No valid sub-nodes generated");
         }
-        
       } catch (parseError) {
         console.error("Failed to parse expansion response:", parseError);
         console.log("Raw response text:", expansionText);
-        
         // Return default expansion nodes on parsing error
         expansionResult = {
           subNodes: [
             {
-              title: `${nodeTitle} - Fundamentals`,
-              description: `Basic principles and foundational concepts of ${nodeTitle}`,
-              hasChildren: true
+              title: `${nodeTitle} - Core Concepts`,
+              description: `Fundamental concepts and principles of ${nodeTitle} in ${subjectContext}`,
+              hasChildren: true,
             },
             {
-              title: `${nodeTitle} - Applications`,
-              description: `Practical applications and real-world uses of ${nodeTitle}`,
-              hasChildren: true
+              title: `${nodeTitle} - Practical Applications`,
+              description: `Real-world applications and implementation of ${nodeTitle} within ${subjectContext}`,
+              hasChildren: true,
             },
             {
-              title: `${nodeTitle} - Advanced Concepts`,
-              description: `Advanced topics and deeper understanding of ${nodeTitle}`,
-              hasChildren: true
-            }
-          ]
+              title: `${nodeTitle} - Advanced Topics`,
+              description: `Advanced concepts and deeper understanding of ${nodeTitle} in the context of ${subjectContext}`,
+              hasChildren: true,
+            },
+          ],
         };
-      }
-
-      // Update the mind map in the database with the new expanded nodes
-      if (db) {
+      } // Update the mind map in the database with the new expanded nodes
+      if (db && mindMapId) {
         try {
-          const mindMap = await db.collection("mindmaps").findOne({
-            _id: new ObjectId(mindMapId),
-            userId: userId
-          });
+          let mindMap = null;
+          let updateQuery = {};
+
+          // Determine the correct query based on ID format
+          if (ObjectId.isValid(mindMapId)) {
+            // Standard MongoDB ObjectId format
+            updateQuery = { _id: new ObjectId(mindMapId), userId: userId };
+            mindMap = await db.collection("mindmaps").findOne(updateQuery);
+          } else {
+            // Custom ID format - try different fields
+            updateQuery = { mindMapId: mindMapId, userId: userId };
+            mindMap = await db.collection("mindmaps").findOne(updateQuery);
+
+            if (!mindMap) {
+              updateQuery = { customId: mindMapId, userId: userId };
+              mindMap = await db.collection("mindmaps").findOne(updateQuery);
+            }
+          }
 
           if (mindMap) {
             // Generate unique IDs for the new sub-nodes
-            const newSubNodes = expansionResult.subNodes.map((subNode, index) => ({
-              id: `${nodeId}_expanded_${index + 1}`,
-              title: subNode.title,
-              description: subNode.description,
-              hasChildren: subNode.hasChildren !== false, // Default to true unless explicitly false
-              parentNode: nodeId,
-              level: (currentLevel || 0) + 1,
-              isExpanded: false,
-              position: { x: 0, y: 0 } // Will be calculated by frontend
-            }));
-
-            // Update the mind map document to mark the node as expanded and add the new sub-nodes
-            await db.collection("mindmaps").updateOne(
-              { _id: new ObjectId(mindMapId), userId: userId },
-              { 
-                $set: { 
-                  [`expandedNodes.${nodeId}`]: {
-                    expanded: true,
-                    subNodes: newSubNodes,
-                    expandedAt: new Date()
-                  },
-                  lastModified: new Date()
-                }
-              }
+            const newSubNodes = expansionResult.subNodes.map(
+              (subNode, index) => ({
+                id: `${nodeId}_expanded_${index + 1}`,
+                title: subNode.title,
+                description: subNode.description,
+                hasChildren: subNode.hasChildren !== false, // Default to true unless explicitly false
+                parentNode: nodeId,
+                level: (currentLevel || 0) + 1,
+                isExpanded: false,
+                position: { x: 0, y: 0 }, // Will be calculated by frontend
+              })
             );
 
-            console.log(`Successfully expanded node ${nodeId} with ${newSubNodes.length} sub-nodes`);
+            // Update the mind map document to mark the node as expanded and add the new sub-nodes
+            await db.collection("mindmaps").updateOne(updateQuery, {
+              $set: {
+                [`expandedNodes.${nodeId}`]: {
+                  expanded: true,
+                  subNodes: newSubNodes,
+                  expandedAt: new Date(),
+                },
+                lastModified: new Date(),
+              },
+            });
+
+            console.log(
+              `Successfully expanded node ${nodeId} with ${newSubNodes.length} sub-nodes`
+            );
+          } else {
+            console.log(
+              `Mind map not found for expansion update. ID: ${mindMapId}`
+            );
           }
         } catch (dbError) {
           console.error("Error updating mind map in database:", dbError);
@@ -2702,47 +3090,45 @@ Generate exactly 3-5 sub-nodes that provide comprehensive coverage of the topic.
           hasChildren: subNode.hasChildren !== false,
           parentNode: nodeId,
           level: (currentLevel || 0) + 1,
-          isExpanded: false
-        }))
+          isExpanded: false,
+        })),
       });
-
     } catch (apiError) {
-      console.error("Error calling Gemini API for node expansion:", apiError);
-      
+      console.error("Error calling OpenAI API for node expansion:", apiError);
       // Return default expansion nodes on API error
       const defaultSubNodes = [
         {
           id: `${nodeId}_expanded_1`,
-          title: `${nodeTitle} - Fundamentals`,
-          description: `Basic principles and foundational concepts of ${nodeTitle}`,
+          title: `${nodeTitle} - Core Concepts`,
+          description: `Fundamental concepts and principles of ${nodeTitle} in ${subjectContext}`,
           hasChildren: true,
           parentNode: nodeId,
           level: (currentLevel || 0) + 1,
-          isExpanded: false
+          isExpanded: false,
         },
         {
           id: `${nodeId}_expanded_2`,
-          title: `${nodeTitle} - Applications`,
-          description: `Practical applications and real-world uses of ${nodeTitle}`,
+          title: `${nodeTitle} - Implementation`,
+          description: `Practical implementation and applications of ${nodeTitle} within ${subjectContext}`,
           hasChildren: true,
           parentNode: nodeId,
           level: (currentLevel || 0) + 1,
-          isExpanded: false
+          isExpanded: false,
         },
         {
           id: `${nodeId}_expanded_3`,
           title: `${nodeTitle} - Advanced Topics`,
-          description: `Advanced concepts and deeper understanding of ${nodeTitle}`,
+          description: `Advanced concepts and deeper understanding of ${nodeTitle} in the context of ${subjectContext}`,
           hasChildren: true,
           parentNode: nodeId,
           level: (currentLevel || 0) + 1,
-          isExpanded: false
-        }
+          isExpanded: false,
+        },
       ];
 
       return res.json({
         success: true,
-        expandedNodes: defaultSubNodes
+        expandedNodes: defaultSubNodes,
       });
     }
   } catch (error) {
@@ -2750,6 +3136,253 @@ Generate exactly 3-5 sub-nodes that provide comprehensive coverage of the topic.
     return res.status(500).json({
       success: false,
       error: "Failed to expand node",
+      details: error.message,
+    });
+  }
+});
+
+// Mind Map Node Quiz Generator Endpoint - Generates quiz questions for mark-as-read verification
+app.post("/api/mindmap/node-quiz", verifyToken, async (req, res) => {
+  try {
+    const { nodeId, nodeDescription } = req.body;
+
+    if (!nodeId || !nodeDescription) {
+      return res.status(400).json({
+        success: false,
+        error: "Node ID and description are required",
+      });
+    }
+
+    console.log(`Generating quiz questions for node: ${nodeId}`);
+    try {
+      // Use OpenAI for quiz generation
+      const quizOpenAI = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+        maxRetries: 2,
+      });
+
+      const completion = await quizOpenAI.chat.completions.create({
+        messages: [
+          {
+            role: "system",
+            content: `You are an AI tutor that creates quiz questions to test student understanding of educational content.
+
+You will generate exactly 3 multiple-choice questions to verify that the student has properly understood the material.
+
+Requirements for each question:
+1. Should test genuine understanding, not just memorization
+2. Should be directly related to the provided content
+3. Must have exactly 4 options (A, B, C, D)
+4. Only ONE option should be correct
+5. Questions should be at an appropriate difficulty level - not too easy, not too hard
+6. Avoid trick questions or overly complex wording
+
+IMPORTANT: Return ONLY a valid JSON object in the exact format below. Do not include any markdown formatting, code blocks, or explanations.
+
+Required format:
+{
+  "questions": [
+    {
+      "question": "Question text here?",
+      "options": {
+        "A": "First option",
+        "B": "Second option", 
+        "C": "Third option",
+        "D": "Fourth option"
+      },
+      "correct": "A",
+      "explanation": "Brief explanation of why this answer is correct"
+    }
+  ]
+}
+
+Your response must be valid JSON that can be parsed directly.`,
+          },
+          {
+            role: "user",
+            content: `Generate exactly 3 multiple-choice questions based on this educational content about "${nodeId}":
+
+Content:
+${nodeDescription}
+
+Create questions that test genuine understanding of the key concepts, with appropriate difficulty level.`,
+          },
+        ],
+        model: "gpt-3.5-turbo",
+        temperature: 0.2,
+        max_tokens: 1000,
+        response_format: { type: "json_object" },
+      });
+
+      // Extract the generated content from OpenAI response
+      let quizText =
+        completion.choices[0]?.message?.content || '{"questions": []}';
+
+      // Clean up the response - remove markdown code blocks if present
+      quizText = quizText
+        .replace(/```json\s*/g, "")
+        .replace(/```\s*/g, "")
+        .trim();
+
+      // Parse the JSON quiz or return default questions if parsing fails
+      let quizData;
+      try {
+        quizData = JSON.parse(quizText);
+
+        // Validate that we got the expected structure
+        if (
+          !quizData.questions ||
+          !Array.isArray(quizData.questions) ||
+          quizData.questions.length === 0
+        ) {
+          throw new Error("Invalid response format - missing questions array");
+        }
+
+        // Validate each question has the required structure
+        quizData.questions = quizData.questions
+          .filter(
+            (q) =>
+              q.question &&
+              q.options &&
+              q.correct &&
+              typeof q.question === "string" &&
+              typeof q.options === "object" &&
+              typeof q.correct === "string" &&
+              q.options.A &&
+              q.options.B &&
+              q.options.C &&
+              q.options.D
+          )
+          .slice(0, 3); // Ensure we have at most 3 questions
+
+        if (quizData.questions.length < 3) {
+          // Fill with generic questions if we don't have enough
+          while (quizData.questions.length < 3) {
+            const questionNum = quizData.questions.length + 1;
+            quizData.questions.push({
+              question: `What is a key concept from this topic that you should remember?`,
+              options: {
+                A: "I understand the main concepts",
+                B: "I need to review more",
+                C: "I'm not sure about this topic",
+                D: "I haven't read the content carefully",
+              },
+              correct: "A",
+              explanation:
+                "Understanding the main concepts is essential for mastering this topic.",
+            });
+          }
+        }
+      } catch (parseError) {
+        console.error("Failed to parse quiz response:", parseError);
+        console.log("Raw response text:", quizText);
+
+        // Return default quiz questions
+        quizData = {
+          questions: [
+            {
+              question:
+                "Have you carefully read and understood the main concepts of this topic?",
+              options: {
+                A: "Yes, I understand the core concepts",
+                B: "I skimmed through it",
+                C: "I haven't read it yet",
+                D: "I'm confused about the content",
+              },
+              correct: "A",
+              explanation:
+                "Careful reading and understanding is required to mark a topic as complete.",
+            },
+            {
+              question:
+                "Can you explain or apply the key ideas from this topic?",
+              options: {
+                A: "Yes, I can explain and apply the concepts",
+                B: "I remember some parts",
+                C: "I need to review again",
+                D: "I don't understand the concepts",
+              },
+              correct: "A",
+              explanation:
+                "Being able to explain and apply concepts shows true understanding.",
+            },
+            {
+              question:
+                "Do you feel confident about your knowledge of this topic?",
+              options: {
+                A: "Yes, I'm confident in my understanding",
+                B: "Somewhat confident",
+                C: "Not very confident",
+                D: "I'm not confident at all",
+              },
+              correct: "A",
+              explanation:
+                "Confidence in your understanding indicates you've mastered the topic.",
+            },
+          ],
+        };
+      }
+
+      return res.json({
+        success: true,
+        quiz: quizData,
+      });
+    } catch (apiError) {
+      console.error("Error calling OpenAI API for quiz generation:", apiError);
+
+      // Return default quiz on API error
+      return res.json({
+        success: true,
+        quiz: {
+          questions: [
+            {
+              question:
+                "Have you carefully read and understood the main concepts of this topic?",
+              options: {
+                A: "Yes, I understand the core concepts",
+                B: "I skimmed through it",
+                C: "I haven't read it yet",
+                D: "I'm confused about the content",
+              },
+              correct: "A",
+              explanation:
+                "Careful reading and understanding is required to mark a topic as complete.",
+            },
+            {
+              question:
+                "Can you explain or apply the key ideas from this topic?",
+              options: {
+                A: "Yes, I can explain and apply the concepts",
+                B: "I remember some parts",
+                C: "I need to review again",
+                D: "I don't understand the concepts",
+              },
+              correct: "A",
+              explanation:
+                "Being able to explain and apply concepts shows true understanding.",
+            },
+            {
+              question:
+                "Do you feel confident about your knowledge of this topic?",
+              options: {
+                A: "Yes, I'm confident in my understanding",
+                B: "Somewhat confident",
+                C: "Not very confident",
+                D: "I'm not confident at all",
+              },
+              correct: "A",
+              explanation:
+                "Confidence in your understanding indicates you've mastered the topic.",
+            },
+          ],
+        },
+      });
+    }
+  } catch (error) {
+    console.error("Error generating node quiz:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to generate quiz",
       details: error.message,
     });
   }
@@ -2768,14 +3401,16 @@ app.use((err, req, res, next) => {
 // Keep-alive mechanism to prevent Render from sleeping
 const keepAlive = () => {
   const url = process.env.BACKEND_URL || `http://localhost:${PORT}`;
-  
+
   // Only ping if we have a production URL
   if (process.env.BACKEND_URL) {
     setInterval(async () => {
       try {
         const response = await fetch(`${url}/health`);
         if (response.ok) {
-          console.log(`Keep-alive ping successful at ${new Date().toISOString()}`);
+          console.log(
+            `Keep-alive ping successful at ${new Date().toISOString()}`
+          );
         } else {
           console.log(`Keep-alive ping failed with status: ${response.status}`);
         }
@@ -2790,7 +3425,7 @@ const keepAlive = () => {
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  
+
   // Start keep-alive pings after server is running
   keepAlive();
 });
